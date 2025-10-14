@@ -4,6 +4,7 @@ import { User } from '../../../modules/user/entities/user.entity';
 
 @Entity('addresses')
 export class Address extends BaseEntity {
+  
   @Column({ name: 'user_id' })
   userId: string;
 
