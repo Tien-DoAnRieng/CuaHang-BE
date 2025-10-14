@@ -18,8 +18,8 @@ export class ProductService {
     return this.productRepository.save(product);
   }
 
-  async findAll(query: any): Promise<Product[]> {
-    const { search, brand, category, status, minPrice, maxPrice } = query;
+  async findAll(query: any): Promise<{ data: Product[]; total: number; page: number; limit: number }> {
+    const { search, brand, category, status, minPrice, maxPrice, page = 1, limit = 10 } = query;
     const where: any = {};
     if (search) {
       where.name = ILike(`%${search}%`);
@@ -32,10 +32,13 @@ export class ProductService {
       if (minPrice) where.price['$gte'] = minPrice;
       if (maxPrice) where.price['$lte'] = maxPrice;
     }
-    return this.productRepository.find({
+    const [data, total] = await this.productRepository.findAndCount({
       where,
       relations: ['category'],
+      skip: (page - 1) * limit,
+      take: limit,
     });
+    return { data, total, page: Number(page), limit: Number(limit) };
   }
 
   async findOne(id: string): Promise<Product | null> {

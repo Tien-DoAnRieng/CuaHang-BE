@@ -22,6 +22,7 @@ export class ProductController {
 
   @Get()
   findAll(@Query() query: any) {
+    // Hỗ trợ query: page, limit, search, brand, category, status, minPrice, maxPrice
     return this.productService.findAll(query);
   }
 
