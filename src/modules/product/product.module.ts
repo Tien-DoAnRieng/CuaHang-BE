@@ -6,6 +6,10 @@ import { Color } from '../../shared/schemas/entities/color.entity';
 import { Size } from '../../shared/schemas/entities/size.entity';
 import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
 import { ProductImage } from '../../shared/schemas/entities/product-image.entity';
+import { ProductVariantModule } from '../product-variant/product-variant.module';
+import { ProductImageModule } from '../product-image/product-image.module';
+import { ProductController } from './product.controller';
+import { ProductService } from './product.service';
 
 @Module({
   imports: [
@@ -17,7 +21,11 @@ import { ProductImage } from '../../shared/schemas/entities/product-image.entity
       ProductVariant,
       ProductImage,
     ]),
+    ProductVariantModule,
+    ProductImageModule,
   ],
-  exports: [TypeOrmModule],
+  controllers: [ProductController],
+  providers: [ProductService],
+  exports: [TypeOrmModule, ProductVariantModule, ProductImageModule],
 })
 export class ProductModule {}
