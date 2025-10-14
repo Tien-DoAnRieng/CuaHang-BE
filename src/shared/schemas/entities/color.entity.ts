@@ -1,5 +1,5 @@
 import { Column, Entity } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+import { BaseEntity } from '../../../shared/schemas/base.entity';
 
 @Entity('colors')
 export class Color extends BaseEntity {
@@ -8,9 +8,9 @@ export class Color extends BaseEntity {
 
   @Column({ name: 'hex_code' })
   hexCode: string;
-
   constructor(partial: Partial<Color>) {
     super();
     Object.assign(this, partial);
   }
+
 }

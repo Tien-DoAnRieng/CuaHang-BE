@@ -20,6 +20,7 @@ export class ProductService {
 
   async findAll(query: any): Promise<Product[]> {
     const { search, brand, category, status, minPrice, maxPrice } = query;
+
     const where: any = {};
     if (search) {
       where.name = ILike(`%${search}%`);
@@ -32,6 +33,7 @@ export class ProductService {
       if (minPrice) where.price['$gte'] = minPrice;
       if (maxPrice) where.price['$lte'] = maxPrice;
     }
+
     return this.productRepository.find({
       where,
       relations: ['category'],
@@ -45,6 +47,7 @@ export class ProductService {
   // Sửa kiểu trả về để phù hợp với TypeORM
   async findOneOrNull(id: string): Promise<Product | null> {
     return this.productRepository.findOne({ where: { id }, relations: ['category'] });
+
   }
 
   async update(id: string, data: Partial<Product>): Promise<Product | null> {

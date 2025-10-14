@@ -17,15 +17,11 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
-    // Cấu hình môi trường
+
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    
-    // Kết nối database
     TypeOrmModule.forRootAsync(typeOrmConfig),
-    
-    // Các module của ứng dụng
     UserModule,
     ProductModule,
     CartModule,
@@ -33,8 +29,6 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     AuthModule,
     ReviewModule,
     WishlistModule,
-    
-    // Các module tiện ích
     MailModule,
     QueueModule,
     FileUploadModule,
