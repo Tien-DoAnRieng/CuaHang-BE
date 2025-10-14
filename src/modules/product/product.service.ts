@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
-import { Product } from '../../shared/schemas/entities/product.entity';
-import { Category } from '../../shared/schemas/entities/category.entity';
+import { Product } from './product.entity';
+import { Category } from '../category/category.entity';
 
 @Injectable()
 export class ProductService {
@@ -18,8 +18,9 @@ export class ProductService {
     return this.productRepository.save(product);
   }
 
-  async findAll(query: any): Promise<{ data: Product[]; total: number; page: number; limit: number }> {
-    const { search, brand, category, status, minPrice, maxPrice, page = 1, limit = 10 } = query;
+  async findAll(query: any): Promise<Product[]> {
+    const { search, brand, category, status, minPrice, maxPrice } = query;
+
     const where: any = {};
     if (search) {
       where.name = ILike(`%${search}%`);
@@ -32,28 +33,21 @@ export class ProductService {
       if (minPrice) where.price['$gte'] = minPrice;
       if (maxPrice) where.price['$lte'] = maxPrice;
     }
-    const [data, total] = await this.productRepository.findAndCount({
+
+    return this.productRepository.find({
       where,
       relations: ['category'],
-      skip: (page - 1) * limit,
-      take: limit,
     });
-    return { data, total, page: Number(page), limit: Number(limit) };
   }
 
   async findOne(id: string): Promise<Product | null> {
-    return this.productRepository.findOne({
-      where: { id },
-      relations: ['category'],
-    });
+    return this.productRepository.findOne({ where: { id }, relations: ['category'] });
   }
 
   // Sửa kiểu trả về để phù hợp với TypeORM
   async findOneOrNull(id: string): Promise<Product | null> {
-    return this.productRepository.findOne({
-      where: { id },
-      relations: ['category'],
-    });
+    return this.productRepository.findOne({ where: { id }, relations: ['category'] });
+
   }
 
   async update(id: string, data: Partial<Product>): Promise<Product | null> {

@@ -9,7 +9,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
-import { Product } from '../../shared/schemas/entities/product.entity';
+import { Product } from './product.entity';
+
+
 
 @Controller('products')
 export class ProductController {
@@ -22,7 +24,6 @@ export class ProductController {
 
   @Get()
   findAll(@Query() query: any) {
-    // Hỗ trợ query: page, limit, search, brand, category, status, minPrice, maxPrice
     return this.productService.findAll(query);
   }
 

@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Product } from '../../shared/schemas/entities/product.entity';
-import { Category } from '../../shared/schemas/entities/category.entity';
-import { Color } from '../../shared/schemas/entities/color.entity';
-import { Size } from '../../shared/schemas/entities/size.entity';
-import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
-import { ProductImage } from '../../shared/schemas/entities/product-image.entity';
-import { ProductVariantModule } from '../product-variant/product-variant.module';
-import { ProductImageModule } from '../product-image/product-image.module';
-import { ProductController } from './product.controller';
-import { ProductService } from './product.service';
+import { Product } from './entities/product.entity';
+import { Category } from './entities/category.entity';
+import { Color } from './entities/color.entity';
+import { Size } from './entities/size.entity';
+import { ProductVariant } from './entities/product-variant.entity';
+import { ProductImage } from './entities/product-image.entity';
+import { ColorController } from './controllers/color.controller';
+import { ColorService } from './services/color.service';
+import { SizeController } from './controllers/size.controller';
+import { SizeService } from './services/size.service';
 
 @Module({
   imports: [
@@ -19,13 +19,12 @@ import { ProductService } from './product.service';
       Color,
       Size,
       ProductVariant,
-      ProductImage,
-    ]),
-    ProductVariantModule,
-    ProductImageModule,
+
+      ProductImage
+    ])
   ],
-  controllers: [ProductController],
-  providers: [ProductService],
-  exports: [TypeOrmModule, ProductVariantModule, ProductImageModule],
+  controllers: [ColorController, SizeController],
+  providers: [ColorService, SizeService],
+  exports: [TypeOrmModule]
 })
 export class ProductModule {}

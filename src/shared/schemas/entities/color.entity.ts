@@ -8,4 +8,9 @@ export class Color extends BaseEntity {
 
   @Column({ name: 'hex_code' })
   hexCode: string;
+  constructor(partial: Partial<Color>) {
+    super();
+    Object.assign(this, partial);
+  }
+
 }

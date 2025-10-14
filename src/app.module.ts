@@ -17,6 +17,7 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 
 @Module({
   imports: [
+
     ConfigModule.forRoot({
       isGlobal: true,
     }),

@@ -5,6 +5,7 @@ import { diskStorage } from 'multer';
 import { FileUploadService } from './file-upload.service';
 import { FileUploadController } from './file-upload.controller';
 import { extname } from 'path';
+import { FirebaseStorageService } from './firebase-storage.service';
 
 @Module({
   imports: [
@@ -18,20 +19,13 @@ import { extname } from 'path';
             cb(null, uploadPath);
           },
           filename: (req, file, cb) => {
-            const uniqueSuffix =
-              Date.now() + '-' + Math.round(Math.random() * 1e9);
-            cb(
-              null,
-              `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
-            );
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`);
           },
         }),
         fileFilter: (req, file, cb) => {
           if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf|doc|docx)$/)) {
-            return cb(
-              new Error('Only image and document files are allowed!'),
-              false,
-            );
+            return cb(new Error('Only image and document files are allowed!'), false);
           }
           cb(null, true);
         },
@@ -42,7 +36,7 @@ import { extname } from 'path';
     }),
   ],
   controllers: [FileUploadController],
-  providers: [FileUploadService],
-  exports: [FileUploadService],
+  providers: [FileUploadService, FirebaseStorageService],
+  exports: [FileUploadService, FirebaseStorageService],
 })
 export class FileUploadModule {}

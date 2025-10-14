@@ -16,9 +16,15 @@ import { QueueService } from './queue.service';
         },
       }),
     }),
-    BullModule.registerQueue({ name: 'email' }, { name: 'file-processing' }),
+
+    BullModule.registerQueue(
+      { name: 'email' },
+      { name: 'file-processing' },
+    ),
+
   ],
   providers: [QueueService],
   exports: [QueueService],
 })
+
 export class QueueModule {}
