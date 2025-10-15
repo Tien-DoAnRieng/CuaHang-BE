@@ -1,6 +1,8 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+
+import { Column, Entity, JoinColumn, ManyToOne, CreateDateColumn } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
-import { User } from '../../../shared/schemas/entities/user.entity';
+import { User } from '../../schemas/entities/user.entity';
+
 
 @Entity('password_reset_tokens')
 export class PasswordResetToken extends BaseEntity {
@@ -16,7 +18,9 @@ export class PasswordResetToken extends BaseEntity {
   @Column({ default: false })
   used: boolean;
 
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
 }
+

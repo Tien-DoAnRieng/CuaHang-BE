@@ -1,6 +1,8 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
+
 import { Product } from './product.entity';
+
 
 @Entity('categories')
 export class Category extends BaseEntity {

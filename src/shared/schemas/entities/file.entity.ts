@@ -1,5 +1,7 @@
 import { Column, Entity } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+
+import { BaseEntity } from '../../schemas/base.entity';
+
 
 @Entity('files')
 export class FileEntity extends BaseEntity {

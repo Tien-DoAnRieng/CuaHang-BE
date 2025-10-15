@@ -1,6 +1,8 @@
 import { Entity, Column, JoinColumn, ManyToOne } from 'typeorm';
-import { Cart } from '../entities/cart.entity';
-import { ProductVariant } from '../entities/product-variant.entity';
+
+import { Cart } from './cart.entity';
+import { ProductVariant } from '../../schemas/entities/product-variant.entity';
+
 
 @Entity('cart_items')
 export class CartItem {
@@ -20,4 +22,6 @@ export class CartItem {
   @ManyToOne(() => ProductVariant)
   @JoinColumn({ name: 'variant_id' })
   variant: ProductVariant;
+
 }
+

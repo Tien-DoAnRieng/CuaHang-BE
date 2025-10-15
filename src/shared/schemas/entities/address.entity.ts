@@ -1,8 +1,12 @@
-import { Column, Entity } from 'typeorm';
-import { BaseEntity } from '../../../shared/schemas/base.entity';
 
+
+import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../base.entity';
+import { User } from '../../schemas/entities/user.entity';
 @Entity('addresses')
 export class Address extends BaseEntity {
+  
+
   @Column({ name: 'user_id' })
   userId: string;
 
@@ -23,4 +27,17 @@ export class Address extends BaseEntity {
 
   @Column()
   province: string;
+
+    @Column({ default: false })
+    isDefault: boolean;
+
+    @ManyToOne(() => User)
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+
+    constructor(partial: Partial<Address>) {
+      super();
+      Object.assign(this, partial);
+    }
+
 }

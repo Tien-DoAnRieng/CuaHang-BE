@@ -2,8 +2,9 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+
   OnApplicationBootstrap,
-  Logger, // Import Logger
+  Logger, 
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +16,7 @@ import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
+
 export class AuthService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AuthService.name); // Instantiate Logger
 
@@ -24,7 +26,6 @@ export class AuthService implements OnApplicationBootstrap {
     private jwtService: JwtService,
   ) {}
 
-  // This function will run once the application has started
   async onApplicationBootstrap() {
     const customerRole = await this.roleRepo.findOne({ where: { name: 'customer' } });
     if (!customerRole) {
@@ -34,6 +35,7 @@ export class AuthService implements OnApplicationBootstrap {
       this.logger.log('Default role "customer" created.');
     }
   }
+
 
   async register(dto: RegisterUserDto) {
     const exist = await this.userRepo.findOne({ where: { email: dto.email } });
@@ -60,12 +62,12 @@ export class AuthService implements OnApplicationBootstrap {
   }
 
   async login(dto: LoginDto) {
+
     this.logger.log(`Login attempt for email: ${dto.email}`);
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
       relations: ['roles'],
     });
-
     this.logger.log('User object found in DB:', JSON.stringify(user, null, 2));
 
     if (!user) {
@@ -80,16 +82,13 @@ export class AuthService implements OnApplicationBootstrap {
     }
 
     this.logger.log(`Login successful for: ${dto.email}`);
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      roles: user.roles.map((r) => r.name),
-    };
 
+    const payload = { sub: user.id, roles: user.roles.map((r) => r.name) };
     const token = this.jwtService.sign(payload);
 
     // Avoid sending back sensitive info like password hash
     const { passwordHash, ...result } = user;
     return { access_token: token, user: result };
+
   }
 }

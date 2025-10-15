@@ -1,4 +1,6 @@
 import { MailerModule } from '@nestjs-modules/mailer';
+
+import { MailController } from './mail.controller';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -20,7 +22,9 @@ import { MailService } from './mail.service';
           },
         },
         defaults: {
-          from: `"No Reply" <${config.get('MAIL_FROM', 'noreply@example.com')}>`,
+
+         from: `"No Reply" <${config.get('MAIL_FROM')}>`,
+
         },
         template: {
           dir: join(__dirname, 'templates'),
@@ -32,6 +36,9 @@ import { MailService } from './mail.service';
       }),
     }),
   ],
+
+  controllers: [MailController],
+
   providers: [MailService],
   exports: [MailService],
 })

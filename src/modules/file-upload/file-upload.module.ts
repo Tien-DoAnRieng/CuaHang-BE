@@ -6,6 +6,7 @@ import { FileUploadService } from './file-upload.service';
 import { FileUploadController } from './file-upload.controller';
 import { extname } from 'path';
 
+
 @Module({
   imports: [
     MulterModule.registerAsync({
@@ -18,20 +19,13 @@ import { extname } from 'path';
             cb(null, uploadPath);
           },
           filename: (req, file, cb) => {
-            const uniqueSuffix =
-              Date.now() + '-' + Math.round(Math.random() * 1e9);
-            cb(
-              null,
-              `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
-            );
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`);
           },
         }),
         fileFilter: (req, file, cb) => {
           if (!file.originalname.match(/\.(jpg|jpeg|png|gif|pdf|doc|docx)$/)) {
-            return cb(
-              new Error('Only image and document files are allowed!'),
-              false,
-            );
+            return cb(new Error('Only image and document files are allowed!'), false);
           }
           cb(null, true);
         },

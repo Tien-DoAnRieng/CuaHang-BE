@@ -1,11 +1,24 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, BeforeInsert } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 
 @Entity('colors')
 export class Color extends BaseEntity {
-  @Column()
+  @Column({ length: 100 })
   name: string;
 
-  @Column({ name: 'hex_code' })
+  @Column({ name: 'hex_code', length: 7 })
   hexCode: string;
+
+  @BeforeInsert()
+  validateHexCode() {
+    if (this.hexCode && !this.hexCode.match(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)) {
+      throw new Error('Invalid hex code format');
+    }
+  }
+
+  // 👇 Constructor đã được chuyển vào ĐÚNG vị trí bên trong class
+  constructor(partial: Partial<Color>) {
+    super();
+    Object.assign(this, partial);
+  }
 }
