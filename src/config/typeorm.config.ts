@@ -22,7 +22,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
       waitForConnections: true,
     },
     autoLoadEntities: true,
-    // Add these for development - remove in production
+    
     debug: process.env.NODE_ENV !== 'production',
     verboseRetryLog: true,
   };
