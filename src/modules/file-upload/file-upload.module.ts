@@ -5,7 +5,7 @@ import { diskStorage } from 'multer';
 import { FileUploadService } from './file-upload.service';
 import { FileUploadController } from './file-upload.controller';
 import { extname } from 'path';
-import { FirebaseStorageService } from './firebase-storage.service';
+
 
 @Module({
   imports: [
@@ -36,7 +36,7 @@ import { FirebaseStorageService } from './firebase-storage.service';
     }),
   ],
   controllers: [FileUploadController],
-  providers: [FileUploadService, FirebaseStorageService],
-  exports: [FileUploadService, FirebaseStorageService],
+  providers: [FileUploadService],
+  exports: [FileUploadService],
 })
 export class FileUploadModule {}

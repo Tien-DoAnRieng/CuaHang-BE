@@ -1,6 +1,4 @@
-
 import { Column, Entity, BeforeInsert } from 'typeorm';
-
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 
 @Entity('colors')
@@ -17,10 +15,10 @@ export class Color extends BaseEntity {
       throw new Error('Invalid hex code format');
     }
   }
-}
+
+  // 👇 Constructor đã được chuyển vào ĐÚNG vị trí bên trong class
   constructor(partial: Partial<Color>) {
     super();
     Object.assign(this, partial);
   }
-
 }

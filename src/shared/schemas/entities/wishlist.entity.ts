@@ -1,6 +1,8 @@
+
 import { Column, Entity, JoinColumn, ManyToOne, CreateDateColumn } from 'typeorm';
 import { User } from '../../schemas/entities/user.entity';
 import { Product } from '../../schemas/entities/product.entity';
+
 
 @Entity('wishlists')
 export class Wishlist {
@@ -10,7 +12,9 @@ export class Wishlist {
   @Column({ name: 'product_id', primary: true })
   productId: string;
 
+
   @CreateDateColumn({ name: 'created_at' })
+
   createdAt: Date;
 
   @ManyToOne(() => User)

@@ -26,4 +26,9 @@ export class User extends BaseEntity {
     },
   })
   roles: Role[];
+
+  constructor(partial?: Partial<User>) {
+    super();
+    Object.assign(this, partial);
+  }
 }

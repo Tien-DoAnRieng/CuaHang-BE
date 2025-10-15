@@ -6,6 +6,7 @@ import { Address } from '../../shared/schemas/entities/address.entity';
 import { Payment } from '../../shared/schemas/entities/payment.entity';
 
 @Module({
+
   imports: [
     TypeOrmModule.forFeature([
       Order,
@@ -14,6 +15,6 @@ import { Payment } from '../../shared/schemas/entities/payment.entity';
       Payment
     ])
   ],
-  exports: [TypeOrmModule]
+  exports: [TypeOrmModule,]
 })
 export class OrderModule {}

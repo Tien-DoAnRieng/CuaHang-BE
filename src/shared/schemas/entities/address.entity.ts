@@ -1,4 +1,5 @@
 
+
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../base.entity';
 import { User } from '../../schemas/entities/user.entity';
@@ -26,6 +27,7 @@ export class Address extends BaseEntity {
 
   @Column()
   province: string;
+
     @Column({ default: false })
     isDefault: boolean;
 

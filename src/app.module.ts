@@ -16,6 +16,7 @@ import { ReviewModule } from './modules/review/review.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { AddressModule } from './modules/order/adrees.module';
 @Module({
   imports: [
 
@@ -33,6 +34,8 @@ import { ConfigService } from '@nestjs/config';
     MailModule,
     QueueModule,
     FileUploadModule,
+    AddressModule,
+
      MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -43,8 +46,8 @@ import { ConfigService } from '@nestjs/config';
         // ignoreTLS: true,
         // secure: false,
         auth: {
-          user: process.env.MAILDEV_INCOMING_USER,
-          pass: process.env.MAILDEV_INCOMING_PASS,
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASS,
         },
       },
       defaults: {
@@ -53,6 +56,7 @@ import { ConfigService } from '@nestjs/config';
     }),
     inject: [ConfigService],
     }),
+
   ],
   controllers: [AppController],
   providers: [AppService],

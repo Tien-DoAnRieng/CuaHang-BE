@@ -2,6 +2,9 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+
+  OnApplicationBootstrap,
+  Logger, 
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,12 +16,26 @@ import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
-export class AuthService {
+
+export class AuthService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(AuthService.name); // Instantiate Logger
+
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Role) private roleRepo: Repository<Role>,
     private jwtService: JwtService,
   ) {}
+
+  async onApplicationBootstrap() {
+    const customerRole = await this.roleRepo.findOne({ where: { name: 'customer' } });
+    if (!customerRole) {
+      this.logger.log('Default role "customer" not found. Creating it...');
+      const newRole = this.roleRepo.create({ name: 'customer' });
+      await this.roleRepo.save(newRole);
+      this.logger.log('Default role "customer" created.');
+    }
+  }
+
 
   async register(dto: RegisterUserDto) {
     const exist = await this.userRepo.findOne({ where: { email: dto.email } });
@@ -45,24 +62,33 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+
+    this.logger.log(`Login attempt for email: ${dto.email}`);
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
       relations: ['roles'],
     });
+    this.logger.log('User object found in DB:', JSON.stringify(user, null, 2));
 
-    if (!user) throw new UnauthorizedException('Email không tồn tại');
+    if (!user) {
+      this.logger.warn(`Login failed: User not found for email ${dto.email}`);
+      throw new UnauthorizedException('Email không tồn tại');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('Mật khẩu không đúng');
+    if (!valid) {
+      this.logger.warn(`Login failed: Invalid password for email ${dto.email}`);
+      throw new UnauthorizedException('Mật khẩu không đúng');
+    }
 
-    const payload = {
-      sub: user.id,
-      email: user.email,
-      roles: user.roles.map((r) => r.name),
-    };
+    this.logger.log(`Login successful for: ${dto.email}`);
 
+    const payload = { sub: user.id, roles: user.roles.map((r) => r.name) };
     const token = this.jwtService.sign(payload);
 
-    return { access_token: token, user };
+    // Avoid sending back sensitive info like password hash
+    const { passwordHash, ...result } = user;
+    return { access_token: token, user: result };
+
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { Product } from '../../shared/schemas/entities/product.entity';
 import { Category } from '../../shared/schemas/entities/category.entity';
 
@@ -22,26 +22,27 @@ export class ProductService {
     const { search, brand, category, status, minPrice, maxPrice, page = 1, limit = 10 } = query;
 
     const where: any = {};
-    if (search) {
-      where.name = ILike(`%${search}%`);
-    }
+
+    if (search) where.name = ILike(`%${search}%`);
     if (brand) where.brand = brand;
     if (category) where.category = { id: category };
     if (status) where.status = status;
-    if (minPrice || maxPrice) {
-      where.price = {};
-      if (minPrice) where.price['$gte'] = minPrice;
-      if (maxPrice) where.price['$lte'] = maxPrice;
+
+    if (minPrice && maxPrice) {
+      where.price = Between(minPrice, maxPrice);
+    } else if (minPrice) {
+      where.price = MoreThanOrEqual(minPrice);
+    } else if (maxPrice) {
+      where.price = LessThanOrEqual(maxPrice);
     }
+
     const [data, total] = await this.productRepository.findAndCount({
-
-
-    return this.productRepository.find({
       where,
       relations: ['category'],
       skip: (page - 1) * limit,
       take: limit,
     });
+
     return { data, total, page: Number(page), limit: Number(limit) };
   }
 
@@ -52,16 +53,11 @@ export class ProductService {
     });
   }
 
-  
   async findOneOrNull(id: string): Promise<Product | null> {
-<<<<<<< src/modules/product/product.service.ts
     return this.productRepository.findOne({
       where: { id },
       relations: ['category'],
     });
-    return this.productRepository.findOne({ where: { id }, relations: ['category'] });
-
-
   }
 
   async update(id: string, data: Partial<Product>): Promise<Product | null> {

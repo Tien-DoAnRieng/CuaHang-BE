@@ -1,3 +1,4 @@
+
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { Category } from './category.entity';

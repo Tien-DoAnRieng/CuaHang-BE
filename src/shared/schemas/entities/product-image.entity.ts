@@ -24,4 +24,5 @@ export class ProductImage extends BaseEntity {
   @ManyToOne(() => ProductVariant)
   @JoinColumn({ name: 'variant_id' })
   variant?: ProductVariant;
+
 }

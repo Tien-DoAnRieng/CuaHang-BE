@@ -1,4 +1,14 @@
-import { Controller, Post, UploadedFile, UseInterceptors, BadRequestException, Get, Param, Delete, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Get,
+  Param,
+  Delete,
+  Res,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBody, ApiResponse, ApiConsumes } from '@nestjs/swagger';
 import { FileUploadService } from './file-upload.service';
@@ -34,7 +44,11 @@ export class FileUploadController {
   }
 
   @Get(':filename')
-  @ApiResponse({ status: 200, description: 'Get file by filename', schema: { example: { file: 'file-123456.png' } } })
+  @ApiResponse({
+    status: 200,
+    description: 'Get file by filename',
+    schema: { example: { file: 'file-123456.png' } },
+  })
   async getFile(@Param('filename') filename: string, @Res() res: Response) {
     const fileStream = await this.fileUploadService.getFileStream(filename);
     fileStream.pipe(res);
