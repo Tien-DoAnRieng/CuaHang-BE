@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Size } from '../entities/size.entity';
+import { Size } from '../../../shared/schemas/entities/size.entity';
 import { CreateSizeDto } from '../dto/create-size.dto';
 import { UpdateSizeDto } from '../dto/update-size.dto';
 

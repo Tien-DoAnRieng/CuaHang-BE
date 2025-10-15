@@ -5,7 +5,7 @@ import { CreateAddressDto } from '../dto/create-address.dto';
 import { UpdateAddressDto } from '../dto/update-address.dto';
 import { Address } from '../../../shared/schemas/entities/address.entity';
 
-@ApiTags('addresses')
+@ApiTags('Addresses')
 @Controller('addresses')
 export class AddressController {
     constructor(private readonly addressService: AddressService) {}

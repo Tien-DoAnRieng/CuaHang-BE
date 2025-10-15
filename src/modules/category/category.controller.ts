@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Get, Param, Put, Delete } from '@nestjs/common';
-import { Category } from './category.entity';
+import { Category } from '../../shared/schemas/entities/category.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 

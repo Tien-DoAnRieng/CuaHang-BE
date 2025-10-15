@@ -1,5 +1,5 @@
 import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
-import { BaseEntity } from '../base.entity';
+import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { Role } from './role.entity';
 
 @Entity('users')
@@ -27,5 +27,3 @@ export class User extends BaseEntity {
   })
   roles: Role[];
 }
-
-export { Role };

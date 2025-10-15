@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Color } from '../entities/color.entity';
+import { Color } from '../../../shared/schemas/entities/color.entity';
 import { CreateColorDto } from '../dto/create-color.dto';
 import { UpdateColorDto } from '../dto/update-color.dto';
 

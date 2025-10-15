@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Wishlist } from './entities/wishlist.entity';
+import { Wishlist } from '../../shared/schemas/entities/wishlist.entity';
 
 @Module({
   imports: [

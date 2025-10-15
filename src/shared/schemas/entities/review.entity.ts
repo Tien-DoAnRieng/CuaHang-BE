@@ -1,6 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
-import { User } from '../../../shared/schemas/entities/user.entity';
+import { User } from '../../schemas/entities/user.entity';
 import { Product } from '../../schemas/entities/product.entity';
 
 @Entity('reviews')
