@@ -16,7 +16,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     synchronize: String(get('DB_SYNC', 'false')) === 'true',
     logging: String(get('DB_LOGGING', 'false')) === 'true',   
     charset: 'utf8mb4',
-    // Add these options for better error handling and connection management
+  
     extra: {
       connectionLimit: 10,
       waitForConnections: true,
