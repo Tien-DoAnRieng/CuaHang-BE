@@ -33,3 +33,4 @@ export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
   inject: [ConfigService],
   useFactory: async (configService: ConfigService) => createTypeOrmOptions(configService),
 };
+

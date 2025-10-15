@@ -10,3 +10,4 @@ import { CartItem } from '../../shared/schemas/entities/cart-item.entity';
   exports: [TypeOrmModule]
 })
 export class CartModule {}
+

@@ -19,6 +19,7 @@ import { SizeService } from './services/size.service';
       Color,
       Size,
       ProductVariant,
+
       ProductImage
     ])
   ],

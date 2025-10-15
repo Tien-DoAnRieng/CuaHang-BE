@@ -18,15 +18,11 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
 @Module({
   imports: [
-    // Cấu hình môi trường
+
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    
-    // Kết nối database
     TypeOrmModule.forRootAsync(typeOrmConfig),
-    
-    // Các module của ứng dụng
     UserModule,
     ProductModule,
     CartModule,
@@ -34,7 +30,6 @@ import { ConfigService } from '@nestjs/config';
     AuthModule,
     ReviewModule,
     WishlistModule,
-  
     MailModule,
     QueueModule,
     FileUploadModule,

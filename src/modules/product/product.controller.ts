@@ -11,6 +11,8 @@ import {
 import { ProductService } from './product.service';
 import { Product } from '../../shared/schemas/entities/product.entity';
 
+
+
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}

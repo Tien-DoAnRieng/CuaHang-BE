@@ -22,6 +22,7 @@ import { MailService } from './mail.service';
         },
         defaults: {
          from: `"No Reply" <${config.get('MAIL_FROM')}>`,
+
         },
         template: {
           dir: join(__dirname, 'templates'),
