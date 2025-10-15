@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PasswordResetToken } from '../../shared/schemas/entities/password-reset-token.entity';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { UserModule } from '../user/user.module';
 import { MailModule } from '../mail/mail.module';
 import { User } from '../../shared/schemas/entities/user.entity';

@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
-import { Product } from './product.entity';
+import { Product } from '../../shared/schemas/entities/product.entity';
 
 
 

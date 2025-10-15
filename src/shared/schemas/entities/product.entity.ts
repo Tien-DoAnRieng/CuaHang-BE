@@ -1,25 +1,36 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Category } from '../../../shared/schemas/entities/category.entity';
-@Entity('products')
-export class Product {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { BaseEntity } from '../../../shared/schemas/base.entity';
+import { Category } from './category.entity';
+import { ProductVariant } from './product-variant.entity';
+import { ProductImage } from './product-image.entity';
 
-  @Column({ type: 'varchar' })
+@Entity('products')
+export class Product extends BaseEntity {
+  @Column()
   name: string;
 
-  @Column({ type: 'text' })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal' })
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ type: 'varchar' })
+  @Column()
   brand: string;
 
-  @ManyToOne(() => Category, (category) => category.products)
+  @Column({ name: 'category_id' })
+  categoryId: string;
+
+  @Column({ default: 'ACTIVE' })
+  status: string;
+
+  @ManyToOne(() => Category)
+  @JoinColumn({ name: 'category_id' })
   category: Category;
 
-  @Column({ type: 'varchar', default: 'ACTIVE' })
-  status: string;
+  @OneToMany(() => ProductVariant, variant => variant.product)
+  variants: ProductVariant[];
+
+  @OneToMany(() => ProductImage, (image: ProductImage) => image.product)
+  images: ProductImage[];
 }

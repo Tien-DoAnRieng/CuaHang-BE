@@ -12,17 +12,17 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     password: get('DB_PASSWORD', ''),
     database: get('DB_DATABASE', 'Ecommerce'),
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    // environment variables are strings; coerce to boolean
+   
     synchronize: String(get('DB_SYNC', 'false')) === 'true',
-    logging: String(get('DB_LOGGING', 'false')) === 'true',
+    logging: String(get('DB_LOGGING', 'false')) === 'true',   
     charset: 'utf8mb4',
-    // Add these options for better error handling and connection management
+  
     extra: {
       connectionLimit: 10,
       waitForConnections: true,
     },
     autoLoadEntities: true,
-    // Add these for development - remove in production
+    
     debug: process.env.NODE_ENV !== 'production',
     verboseRetryLog: true,
   };

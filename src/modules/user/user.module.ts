@@ -1,8 +1,8 @@
 
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
-import { Role } from './entities/role.entity';
+import { User } from '../../shared/schemas/entities/user.entity';
+import { Role } from '../../shared/schemas/entities/role.entity';
 
 @Module({
   imports: [

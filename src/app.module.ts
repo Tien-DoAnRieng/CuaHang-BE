@@ -14,7 +14,8 @@ import { QueueModule } from './modules/queue/queue.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { ReviewModule } from './modules/review/review.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
-
+import { MailerModule } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
 @Module({
   imports: [
 
@@ -32,6 +33,26 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
     MailModule,
     QueueModule,
     FileUploadModule,
+     MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+      transport: {
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        // ignoreTLS: true,
+        // secure: false,
+        auth: {
+          user: process.env.MAILDEV_INCOMING_USER,
+          pass: process.env.MAILDEV_INCOMING_PASS,
+        },
+      },
+      defaults: {
+        from: '"No Reply" <no-reply@localhost>',
+      },
+    }),
+    inject: [ConfigService],
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

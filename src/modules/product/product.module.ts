@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Product } from './entities/product.entity';
-import { Category } from './entities/category.entity';
-import { Color } from './entities/color.entity';
-import { Size } from './entities/size.entity';
-import { ProductVariant } from './entities/product-variant.entity';
-import { ProductImage } from './entities/product-image.entity';
+import { Product } from '../../shared/schemas/entities/product.entity';
+import { Category } from '../../shared/schemas/entities/category.entity';
+import { Color } from '../../shared/schemas/entities/color.entity';
+import { Size } from '../../shared/schemas/entities/size.entity';
+import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
+import { ProductImage } from '../../shared/schemas/entities/product-image.entity';
 import { ColorController } from './controllers/color.controller';
 import { ColorService } from './services/color.service';
 import { SizeController } from './controllers/size.controller';

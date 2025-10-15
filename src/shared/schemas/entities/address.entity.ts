@@ -1,7 +1,7 @@
 
 import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../base.entity';
-import { User } from '../../../modules/user/entities/user.entity';
+import { User } from '../../schemas/entities/user.entity';
 @Entity('addresses')
 export class Address extends BaseEntity {
   

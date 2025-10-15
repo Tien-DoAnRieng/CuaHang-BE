@@ -1,6 +1,6 @@
 import { Entity, Column, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
-import { User } from '../../../shared/schemas/entities/user.entity';
+import { User } from '../../schemas/entities/user.entity';
 import { CartItem } from './cart-item.entity';
 
 @Entity('carts')
@@ -12,6 +12,6 @@ export class Cart extends BaseEntity {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @OneToMany(() => CartItem, (cartItem) => cartItem.cart)
+  @OneToMany(() => CartItem, (cartItem: CartItem) => cartItem.cart)
   items: CartItem[];
 }

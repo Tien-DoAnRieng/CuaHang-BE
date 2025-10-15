@@ -18,13 +18,7 @@ export class ProductVariant extends BaseEntity {
   @Column({ name: 'stock_quantity' })
   stockQuantity: number;
 
-  @Column({
-    name: 'price_override',
-    type: 'decimal',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
+  @Column({ name: 'price_override', type: 'decimal', precision: 10, scale: 2, nullable: true })
   priceOverride: number;
 
   @ManyToOne(() => Product)
