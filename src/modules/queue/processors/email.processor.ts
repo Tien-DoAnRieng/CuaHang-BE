@@ -1,42 +1,33 @@
+// src/queue/email.processor.ts
 import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
 import type { Job } from 'bull';
-import { MailService } from '../../mail/mail.service';
+import { MailerService } from '@nestjs-modules/mailer';
+import { Logger } from '@nestjs/common';
 
 @Processor('email')
 export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
 
-  constructor(private readonly mailService: MailService) {}
+  constructor(private readonly mailerService: MailerService) {}
 
-  @Process('welcome-email')
-  async handleWelcomeEmail(job: Job<{ email: string; username: string }>) {
-    this.logger.debug('Processing welcome email job');
+  @Process('send-verification')
+  async handleEmailVerification(job: Job<{ to: string; name: string; otp: string }>) {
+    const { to, name, otp } = job.data;
+
+    this.logger.debug(`📧 Gửi email xác thực đến: ${to}`);
+
     try {
-      await this.mailService.sendWelcome(job.data.email, job.data.username);
-      this.logger.debug('Welcome email sent successfully');
-    } catch (error) {
-      this.logger.error('Failed to process welcome email job', error);
-      throw error;
+      await this.mailerService.sendMail({
+        to,
+        subject: 'Mã xác thực tài khoản của bạn',
+        template: 'verify-otp', // verify-otp.hbs
+        context: { name, otp },
+      });
+
+      this.logger.log(`✅ Gửi OTP thành công tới ${to}`);
+    } catch (err) {
+      this.logger.error(`❌ Gửi OTP thất bại tới ${to}`, err);
+      throw err;
     }
   }
-
-  @Process('password-reset')
-  async handlePasswordReset(
-    job: Job<{ email: string; token: string; username: string }>,
-  ) {
-    this.logger.debug('Processing password reset email job');
-    try {
-      await this.mailService.sendPasswordReset(
-        job.data.email,
-        job.data.token,
-        job.data.username,
-      );
-      this.logger.debug('Password reset email sent successfully');
-    } catch (error) {
-      this.logger.error('Failed to process password reset email job', error);
-      throw error;
-    }
-  }
-
 }
