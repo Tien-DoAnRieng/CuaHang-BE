@@ -15,8 +15,8 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     entities: [join(__dirname, '/../**/*.entity.{ts,js}')],
 
     // Đồng bộ database (chỉ true khi dev)
-    synchronize: String(get('DB_SYNC', 'false')) === 'true',
-    logging: String(get('DB_LOGGING', 'false')) === 'true',
+    synchronize:false,
+    logging: false, 
 
     // Cấu hình encoding và tối ưu kết nối
     charset: 'utf8mb4',

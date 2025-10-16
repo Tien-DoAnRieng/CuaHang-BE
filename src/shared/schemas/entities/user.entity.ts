@@ -27,6 +27,17 @@ export class User extends BaseEntity {
   })
   roles: Role[];
 
+  // ✅ Cột xác thực email
+  @Column({ default: false })
+  isVerified: boolean;
+
+  // ✅ Thêm 2 cột OTP (cho phép null)
+  @Column({ type: 'varchar', length: 6, nullable: true })
+  otp: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  otpExpiresAt: Date | null;
+
   constructor(partial?: Partial<User>) {
     super();
     Object.assign(this, partial);
