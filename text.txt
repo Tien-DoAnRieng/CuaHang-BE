@@ -60,3 +60,9 @@ POST api/addresses
 GET api/addresses
 PUT api/addresses/:id
 DELETE api/addresses/:id
+POST /cart/add
+{
+  "userId": "98200592-c34f-46e9-aab6-0eb1c526d3f1",
+  "variantId": "a1b2c3d4-e5f6-7890-aaaa-bbbbbbbbbbbb",
+  "quantity": 2
+}
