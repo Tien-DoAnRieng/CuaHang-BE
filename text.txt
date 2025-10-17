@@ -1,0 +1,39 @@
+Test POST /auth/register
+{
+  "name": "Nguyen Van Hung",
+  "email": "luuhung261125@gmail.com",
+  "password": "123456"
+}
+POST /auth/verify
+{
+  "email": "luuhung261125@gmail.com",
+  "otp": "276701"
+}
+POST auth/login
+ {
+     "email": "luuhung261125@gmail.com",
+  "password": "123456"
+ }
+ POST /api/colors Tạo màu
+ {
+  "name": "Red",
+  "hexCode": "#FF0000"
+}
+GET /api/colors Lấy tất cả màu
+GET /api/colors/{id} Lấy chi tiết màu theo ID
+Lấy id từ lúc post sẽ hiện thị 
+  "id": "c78e343b-950c-4faa-9b6b-8fa2612dcb27",
+Thay "id": vào {id}
+PUT api/colors/{id} #Cập nhật màu
+{
+  "name": "Bright Red",
+  "hexCode": "#FF3333"
+}
+DELETE /api/colors/{id} #Xóa màu theo ID
+
+
+POST api/sizes  Tạo size
+{
+  "name": "L",
+  "description": "Large size"
+}

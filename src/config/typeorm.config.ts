@@ -14,10 +14,10 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     database: get('DB_DATABASE', 'Ecommerce'),
     entities: [join(__dirname, '/../**/*.entity.{ts,js}')],
 
-    // Đồng bộ database (chỉ true khi dev)
-    synchronize:false,
+  
+  synchronize: false,
     logging: false, 
-
+  
     // Cấu hình encoding và tối ưu kết nối
     charset: 'utf8mb4',
     extra: {
@@ -28,9 +28,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     // Tự động load entity mà không cần import thủ công trong module
     autoLoadEntities: true,
 
-    // Debug khi ở môi trường dev
-    debug: process.env.NODE_ENV !== 'production',
-    verboseRetryLog: true,
+ 
   };
 }
 
