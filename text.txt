@@ -37,3 +37,26 @@ POST api/sizes  Tạo size
   "name": "L",
   "description": "Large size"
 }
+GET  api/sizes Danh sách size
+GET api/sizes/{id} Chi tiết size
+PUT api/sizes/{id} Cập nhật size
+{
+  "name": "XL",
+  "description": "Extra large"
+}
+DELETE api/sizes/{id} Xóa size
+
+POST api/addresses
+{
+  "userId": "uuid-user", // Thay thế bằng ID của người dùng khi đăng ký nó sẽ có 1 id 
+  "recipientName": "Nguyễn Văn A",
+  "phone": "0912345678",
+  "fullAddress": "123 Đường ABC, Phường 1, Quận 3, TP.HCM",
+  "ward": "Phường 1",
+  "district": "Quận 3",
+  "province": "TP.HCM",
+  "isDefault": true
+}
+GET api/addresses
+PUT api/addresses/:id
+DELETE api/addresses/:id
