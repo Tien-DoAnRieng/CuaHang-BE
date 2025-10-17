@@ -1,17 +1,17 @@
 Test POST /auth/register
 {
   "name": "Nguyen Van Hung",
-  "email": "luuhung261125@gmail.com",
+  "email": "email của mình",
   "password": "123456"
 }
 POST /auth/verify
 {
-  "email": "luuhung261125@gmail.com",
+  "email": "email của mình",
   "otp": "276701"
 }
 POST auth/login
  {
-     "email": "luuhung261125@gmail.com",
+     "email": "email của mình",
   "password": "123456"
  }
  POST /api/colors Tạo màu
