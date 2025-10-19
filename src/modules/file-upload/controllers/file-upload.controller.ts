@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBody, ApiResponse, ApiConsumes } from '@nestjs/swagger';
-import { FileUploadService } from './file-upload.service';
+import { FileUploadService } from '../services/file-upload.service';
 import type { Response } from 'express';
 
 @ApiTags('FileUpload')

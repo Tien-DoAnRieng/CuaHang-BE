@@ -25,6 +25,15 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('Ecommerce') // thêm tag cho nhóm API
     .addServer('http://localhost:3000') // hiện base URL trên Swagger
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        in: 'header',
+      },
+      'access-token', // security name
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
