@@ -29,8 +29,8 @@ import { SizeService } from './services/size.service';
       ProductImage,
     ])
   ],
-  controllers: [ColorController, SizeController],
-  providers: [ColorService, SizeService],
+  controllers: [ProductController, ColorController, SizeController],
+  providers: [ProductService, ColorService, SizeService],
   exports: [TypeOrmModule]
 
 })

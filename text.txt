@@ -1,3 +1,26 @@
+
+Đăng ký user (POST /auth/register)
+Body (JSON):
+{
+"name": "Admin Test",
+"email": "admin@example.com",
+"password": "changeme"
+}
+Kết quả: hệ thống có thể gửi OTP qua email (nếu cấu hình mail hoạt động). Nếu không cần OTP để test, bạn có thể trực tiếp bật user trong DB hoặc dùng endpoint verify nếu có OTP.
+Xác thực email nếu cần (POST /auth/verify)
+Body (JSON):
+{
+"email": "admin@example.com",
+"otp": "123456"
+}
+Đăng nhập để lấy token (POST /auth/login)
+Body (JSON):
+{
+"email": "admin@example.com",
+"password": "changeme"
+}
+Response: { "access_token": "jwt.token.here", "user": { ... } }
+
 Test POST /auth/register
 {
   "name": "Nguyen Van Hung",
@@ -14,6 +37,7 @@ POST auth/login
      "email": "email của mình",
   "password": "123456"
  }
+
  POST /api/colors Tạo màu
  {
   "name": "Red",
@@ -66,3 +90,4 @@ POST /cart/add
   "variantId": "a1b2c3d4-e5f6-7890-aaaa-bbbbbbbbbbbb",
   "quantity": 2
 }
+

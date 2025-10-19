@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual, DeepPartial } from 'typeorm';
 import { Product } from '../../shared/schemas/entities/product.entity';
 import { Category } from '../../shared/schemas/entities/category.entity';
 
@@ -13,9 +13,22 @@ export class ProductService {
     private categoryRepository: Repository<Category>,
   ) {}
 
-  async create(data: Partial<Product>): Promise<Product> {
-    const product = this.productRepository.create(data);
-    return this.productRepository.save(product);
+  async create(data: any): Promise<Product> {
+    let categoryEntity: Category | undefined = undefined;
+    if (data.category) {
+      const found = await this.categoryRepository.findOne({ where: { id: data.category } });
+      if (!found) {
+        throw new Error('Category not found');
+      }
+      categoryEntity = found;
+    }
+    const createPayload: DeepPartial<Product> = {
+      ...data,
+      category: categoryEntity,
+    };
+    const product = this.productRepository.create(createPayload);
+    const saved = await this.productRepository.save(product);
+    return saved as Product;
   }
 
   async findAll(query: any): Promise<{ data: Product[]; total: number; page: number; limit: number }> {

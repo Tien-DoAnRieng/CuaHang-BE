@@ -28,7 +28,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     // Tự động load entity mà không cần import thủ công trong module
     autoLoadEntities: true,
 
- 
+
   };
 }
 

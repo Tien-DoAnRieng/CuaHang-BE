@@ -1,4 +1,3 @@
-// src/modules/category/category.service.ts
 import {
   Injectable,
   NotFoundException,

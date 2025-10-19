@@ -2,10 +2,12 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { diskStorage } from 'multer';
-import { FileUploadService } from './file-upload.service';
-import { FileUploadController } from './file-upload.controller';
+import { FileUploadService } from './services/file-upload.service';
+import { FileUploadController } from './controllers/file-upload.controller';
 import { extname } from 'path';
-
+import { CloudinaryService } from './services/cloudinary.service';
+import { CloudinaryController } from './controllers/cloudinary.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
   imports: [
@@ -34,9 +36,10 @@ import { extname } from 'path';
         },
       }),
     }),
+    TypeOrmModule.forFeature([]),
   ],
-  controllers: [FileUploadController],
-  providers: [FileUploadService],
-  exports: [FileUploadService],
+  controllers: [FileUploadController, CloudinaryController],
+  providers: [FileUploadService, CloudinaryService],
+  exports: [FileUploadService, CloudinaryService],
 })
 export class FileUploadModule {}
