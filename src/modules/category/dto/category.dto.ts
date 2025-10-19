@@ -31,3 +31,4 @@ export class UpdateCategoryDto {
   @IsString({ message: 'parentId phải là chuỗi.' })
   parentId?: string;
 }
+

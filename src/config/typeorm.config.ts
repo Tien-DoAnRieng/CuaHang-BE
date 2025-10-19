@@ -14,10 +14,10 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     database: get('DB_DATABASE', 'Ecommerce'),
     entities: [join(__dirname, '/../**/*.entity.{ts,js}')],
 
-    // Đồng bộ database (chỉ true khi dev)
-    synchronize:false,
+  
+  synchronize: false,
     logging: false, 
-
+  
     // Cấu hình encoding và tối ưu kết nối
     charset: 'utf8mb4',
     extra: {

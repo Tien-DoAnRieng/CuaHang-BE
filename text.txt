@@ -1,3 +1,4 @@
+
 Đăng ký user (POST /auth/register)
 Body (JSON):
 {
@@ -19,6 +20,24 @@ Body (JSON):
 "password": "changeme"
 }
 Response: { "access_token": "jwt.token.here", "user": { ... } }
+
+Test POST /auth/register
+{
+  "name": "Nguyen Van Hung",
+  "email": "email của mình",
+  "password": "123456"
+}
+POST /auth/verify
+{
+  "email": "email của mình",
+  "otp": "276701"
+}
+POST auth/login
+ {
+     "email": "email của mình",
+  "password": "123456"
+ }
+
  POST /api/colors Tạo màu
  {
   "name": "Red",
