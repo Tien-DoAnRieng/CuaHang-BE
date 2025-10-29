@@ -1,4 +1,4 @@
-import { Column, Entity, JoinTable, ManyToMany } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { Role } from './role.entity';
 
@@ -13,25 +13,14 @@ export class User extends BaseEntity {
   @Column({ name: 'password_hash' })
   passwordHash: string;
 
-  @ManyToMany(() => Role)
-  @JoinTable({
-    name: 'user_roles',
-    joinColumn: {
-      name: 'user_id',
-      referencedColumnName: 'id',
-    },
-    inverseJoinColumn: {
-      name: 'role_id',
-      referencedColumnName: 'id',
-    },
-  })
-  roles: Role[];
+  // ✅ Một user chỉ có 1 role
+  @ManyToOne(() => Role, { eager: true }) 
+  @JoinColumn({ name: 'role_id' })
+  role: Role;
 
-  // ✅ Cột xác thực email
   @Column({ default: false })
   isVerified: boolean;
 
-  // ✅ Thêm 2 cột OTP (cho phép null)
   @Column({ type: 'varchar', length: 6, nullable: true })
   otp: string | null;
 

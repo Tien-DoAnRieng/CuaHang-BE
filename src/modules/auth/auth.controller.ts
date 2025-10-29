@@ -1,10 +1,14 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Patch, Body, UseGuards, Param, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiParam, ApiBearerAuth} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { Public } from '../../common/decorators/public.decorator';
-
+import { Roles } from '../../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { ChangeRoleDto } from './dto/change-role.dto';
+import { RoleEnum } from '../../common/enums/role.enum';
 @ApiTags('Auth') // ✅ Nhóm endpoint trong Swagger
 @Controller('auth')
 export class AuthController {
@@ -49,6 +53,7 @@ export class AuthController {
   async verifyEmail(@Body() body: { email: string; otp: string }) {
     return this.authService.verifyEmail(body.email, body.otp);
   }
+ 
 
   @Post('login')
   @ApiOperation({ summary: 'Đăng nhập tài khoản' })
@@ -71,5 +76,23 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Sai email hoặc mật khẩu' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
-  }
+  
+}
+ @Patch(':id/role')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.ADMIN)
+@ApiBearerAuth('access-token') // ⚡ Bật auth cho route này
+@ApiOperation({ summary: 'Admin đổi quyền user' })
+@ApiBody({ schema: { properties: { role: { type: 'string', enum: Object.values(RoleEnum) } } } })
+@ApiResponse({ status: 200, description: 'Đổi role thành công' })
+@ApiResponse({ status: 401, description: 'Unauthorized' })
+@ApiResponse({ status: 403, description: 'Forbidden' })
+async updateUserRole(
+  @Param('id') userId: string,
+  @Body('role') newRole: RoleEnum,
+  @Request() req,
+) {
+  const adminId = req.user.id;
+  return this.authService.updateUserRole(adminId, userId, newRole);
+}
 }

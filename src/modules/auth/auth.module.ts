@@ -7,26 +7,27 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserModule } from '../user/user.module';
-
+import { PassportModule } from '@nestjs/passport';
 import { User } from '../../shared/schemas/entities/user.entity';
 import { Role } from '../../shared/schemas/entities/role.entity';
 import { JwtStrategy } from '../../common/strategies/jwt.strategy';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { QueueModule } from '../queue/queue.module';
+import { UserOtpLog } from '../../shared/schemas/entities/user-otp-log.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TypeOrmModule.forFeature([User, Role]),
-
+    TypeOrmModule.forFeature([User, Role, UserOtpLog]),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET') || 'secret123',
+        secret:  configService.get<string>('JWT_SECRET'),
         signOptions: { expiresIn: '1h' },
       }),
     }),
-
+    PassportModule,
     MailerModule.forRoot({
       transport: {
         host: 'smtp.gmail.com',
