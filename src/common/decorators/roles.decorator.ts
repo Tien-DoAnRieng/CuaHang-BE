@@ -1,6 +1,4 @@
-// src/common/decorators/roles.decorator.ts
 import { SetMetadata } from '@nestjs/common';
+import { RoleEnum } from '../enums/role.enum';
 
-export const ROLES_KEY = 'roles';
-// Sử dụng type của Role name (string)
-export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
+export const Roles = (...roles: RoleEnum[]) => SetMetadata('roles', roles);

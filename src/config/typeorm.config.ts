@@ -15,7 +15,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
     entities: [join(__dirname, '/../**/*.entity.{ts,js}')],
 
   
-  synchronize: false,
+  synchronize: true,
     logging: false, 
   
     // Cấu hình encoding và tối ưu kết nối

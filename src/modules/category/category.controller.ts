@@ -15,6 +15,7 @@ import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Category } from '../../shared/schemas/entities/category.entity';
+import { RoleEnum } from 'src/common/enums/role.enum';
 
 @ApiTags('Category')
 @Controller('categories')
@@ -42,7 +43,7 @@ export class CategoryController {
   @ApiOperation({ summary: 'Tạo danh mục mới (Admin)' })
   @ApiResponse({ status: 201, description: 'Tạo mới danh mục thành công.' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin') // BẮT BUỘC: Chỉ Admin được phép
+ @Roles(RoleEnum.ADMIN)
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
   ): Promise<Category> {
@@ -54,7 +55,7 @@ export class CategoryController {
   @ApiOperation({ summary: 'Cập nhật danh mục (Admin)' })
   @ApiResponse({ status: 200, description: 'Cập nhật danh mục thành công.' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin') // BẮT BUỘC: Chỉ Admin được phép
+  @Roles(RoleEnum.ADMIN)
   async update(
     @Param('id') id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
@@ -67,7 +68,7 @@ export class CategoryController {
   @ApiOperation({ summary: 'Xóa danh mục (Admin)' })
   @ApiResponse({ status: 200, description: 'Xóa danh mục thành công.' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin') // BẮT BUỘC: Chỉ Admin được phép
+ @Roles(RoleEnum.ADMIN)
   async remove(@Param('id') id: string): Promise<void> {
     return this.categoryService.remove(id);
   }
