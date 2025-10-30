@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ApiTags, ApiBody, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBody, ApiResponse, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { AddressService } from '../services/address.service';
 import { CreateAddressDto } from '../dto/create-address.dto';
 import { UpdateAddressDto } from '../dto/update-address.dto';
@@ -28,6 +28,7 @@ export class AddressController {
     @Get(':id')
     @ApiOperation({ summary: 'Get address by ID' })
     @ApiResponse({ status: 200, description: 'Get address by ID', type: Address })
+    @ApiParam({ name: 'id', required: true, description: 'ID của địa chỉ' })
     findOne(@Param('id') id: string) {
         return this.addressService.findOne(id);
     }
@@ -36,6 +37,7 @@ export class AddressController {
     @ApiOperation({ summary: 'Update address' })
     @ApiBody({ type: UpdateAddressDto })
     @ApiResponse({ status: 200, description: 'Address updated', type: Address })
+    @ApiParam({ name: 'id', required: true, description: 'ID của địa chỉ cần cập nhật' })
     update(@Param('id') id: string, @Body() updateAddressDto: UpdateAddressDto) {
         return this.addressService.update(id, updateAddressDto);
     }
@@ -43,6 +45,7 @@ export class AddressController {
     @Delete(':id')
     @ApiOperation({ summary: 'Delete address' })
     @ApiResponse({ status: 204, description: 'Address deleted' })
+    @ApiParam({ name: 'id', required: true, description: 'ID của địa chỉ cần xóa' })
     remove(@Param('id') id: string) {
         return this.addressService.remove(id);
     }
