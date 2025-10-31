@@ -38,15 +38,28 @@ export class OrderService {
     return { data, total, page, limit };
   }
 
+  // User: Lấy danh sách đơn hàng của 1 user (own orders)
+  async findByUser(userId: string, { page = 1, limit = 10 }: { page?: number; limit?: number } = {}) {
+    const [data, total] = await this.orderRepository.findAndCount({
+      where: { userId },
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return { data, total, page, limit };
+  }
+
   // Admin: Get order by id
   async findOne(id: string): Promise<Order | null> {
     return await this.orderRepository.findOne({ where: { id } });
   }
 
-  // Admin: Update order
-  async update(id: string, dto: UpdateOrderDto): Promise<Order | null> {
-    await this.orderRepository.update(id, dto);
-    return await this.findOne(id);
+  // Admin: Update order status only
+  async updateStatus(id: string, status: string): Promise<Order | null> {
+    const order = await this.orderRepository.findOne({ where: { id } });
+    if (!order) return null;
+    order.status = status;
+    return await this.orderRepository.save(order);
   }
 
   // Admin: Delete order

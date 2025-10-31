@@ -2,17 +2,18 @@ import {
   Controller,
   Post,
   Body,
-  Put,
   Param,
   Get,
   Query,
   Delete,
   UseGuards,
+  Patch,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { OrderService } from '../services/order.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
-import { UpdateOrderDto } from '../dto/update-order.dto';
+import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -36,11 +37,22 @@ export class OrderController {
 
   // User: Cancel order
   @UseGuards(JwtAuthGuard)
-  @Put(':id/cancel')
+  @Patch(':id/cancel')
   @ApiOperation({ summary: 'User huỷ đơn hàng' })
   @ApiResponse({ status: 200, description: 'Huỷ đơn hàng thành công' })
   async cancelOrder(@Param('id') id: string) {
     return this.orderService.cancelOrder(id);
+  }
+
+  // User: Lấy danh sách đơn hàng của chính họ
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiOperation({ summary: 'User: Lấy danh sách đơn hàng của chính mình' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findOwnOrders(@Req() req: any, @Query('page') page = 1, @Query('limit') limit = 10) {
+    const userId = req.user?.id;
+    return this.orderService.findByUser(userId, { page: Number(page), limit: Number(limit) });
   }
 
   // Admin: List orders with search & pagination
@@ -69,15 +81,15 @@ export class OrderController {
     return this.orderService.findOne(id);
   }
 
-  // Admin: Update order
+  // Admin: Update order status only
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
-  @Put(':id')
-  @ApiOperation({ summary: 'Admin cập nhật đơn hàng' })
-  @ApiBody({ type: UpdateOrderDto })
-  @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng cần cập nhật' })
-  async update(@Param('id') id: string, @Body() dto: UpdateOrderDto) {
-    return this.orderService.update(id, dto);
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Admin cập nhật trạng thái đơn hàng' })
+  @ApiBody({ type: UpdateOrderStatusDto })
+  @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng cần cập nhật trạng thái' })
+  async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
+    return this.orderService.updateStatus(id, dto.status);
   }
 
   // Admin: Delete order
