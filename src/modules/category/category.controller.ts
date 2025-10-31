@@ -8,8 +8,8 @@ import {
   Delete,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { AuthGuard } from '@nestjs/passport';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -34,15 +34,26 @@ export class CategoryController {
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết một danh mục' })
   @ApiResponse({ status: 200, description: 'Chi tiết danh mục.' })
+  @ApiParam({ name: 'id', required: true, description: 'ID của danh mục' })
   async findOne(@Param('id') id: string): Promise<Category> {
     return this.categoryService.findOne(id);
   }
   // 2. API QUẢN LÝ (Chỉ dành cho ADMIN)
   /** API: Tạo danh mục mới (Chức năng Admin) */
   @Post()
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Tạo danh mục mới (Admin)' })
+  @ApiBody({
+    type: CreateCategoryDto,
+    examples: {
+      default: {
+        value: { name: 'Giày dép', description: 'Danh mục giày dép', parentId: null },
+        summary: 'Ví dụ tạo mới danh mục',
+      },
+    },
+  })
   @ApiResponse({ status: 201, description: 'Tạo mới danh mục thành công.' })
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
  @Roles(RoleEnum.ADMIN)
   async create(
     @Body() createCategoryDto: CreateCategoryDto,
@@ -54,7 +65,10 @@ export class CategoryController {
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật danh mục (Admin)' })
   @ApiResponse({ status: 200, description: 'Cập nhật danh mục thành công.' })
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @ApiBearerAuth('access-token')
+  @ApiBody({ type: UpdateCategoryDto })
+  @ApiParam({ name: 'id', required: true, description: 'ID của danh mục cần cập nhật' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   async update(
     @Param('id') id: string,
@@ -67,8 +81,10 @@ export class CategoryController {
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa danh mục (Admin)' })
   @ApiResponse({ status: 200, description: 'Xóa danh mục thành công.' })
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
- @Roles(RoleEnum.ADMIN)
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @ApiParam({ name: 'id', required: true, description: 'ID của danh mục cần xóa' })
   async remove(@Param('id') id: string): Promise<void> {
     return this.categoryService.remove(id);
   }

@@ -2,7 +2,8 @@
 // src/modules/user/user.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UserService } from './user.service';
+import { UserService } from './services/user.service';
+import { UserController } from './controllers/user.controller';
 // Điều chỉnh đường dẫn Entity theo cấu trúc mới
 import { User } from '../../shared/schemas/entities/user.entity';
 import { Role } from '../../shared/schemas/entities/role.entity';
@@ -10,6 +11,7 @@ import { Role } from '../../shared/schemas/entities/role.entity';
 @Module({
   // Cho phép TypeOrmModule sử dụng cả User và Role
   imports: [TypeOrmModule.forFeature([User, Role])],
+  controllers: [UserController],
   providers: [UserService],
   exports: [UserService],
 })

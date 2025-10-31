@@ -90,7 +90,20 @@ POST /cart/add
   "variantId": "a1b2c3d4-e5f6-7890-aaaa-bbbbbbbbbbbb",
   "quantity": 2
 }
+
+Post api/product
+{
+  "name": "Áo thun nam",
+  "description": "Áo thun cotton thoáng mát",
+  "price": 199000,
+  "brand": "Coolmate",
+  "category": "id-cua-category",  // Thay bằng id thực tế của category vừa tạo
+  "status": "active"
+}
+
+
 POST /auth/forgot-password
+
 
 {
   "email": "email cần đổi mật khẩu"
