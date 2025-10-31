@@ -90,6 +90,7 @@ POST /cart/add
   "variantId": "a1b2c3d4-e5f6-7890-aaaa-bbbbbbbbbbbb",
   "quantity": 2
 }
+
 Post api/product
 {
   "name": "Áo thun nam",
@@ -101,3 +102,19 @@ Post api/product
 }
 
 
+POST /auth/forgot-password
+
+
+{
+  "email": "email cần đổi mật khẩu"
+}
+POST /auth/verify-reset-otp
+{
+  "email": "email cần đổi mật khẩu",
+  "otp": "mã gửi về "
+}
+POST /auth/reset-password
+{
+  "email": "email cần đổi mật khẩu",
+  "password": "mật khẩu mới"
+}

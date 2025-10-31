@@ -166,4 +166,57 @@ export class AuthService implements OnApplicationBootstrap {
 
     return { message: `Đã đổi quyền của ${user.email} thành ${newRoleName}` };
   }
+  async sendResetPasswordOtp(email: string) {
+  const user = await this.userRepo.findOne({ where: { email } });
+  if (!user) throw new BadRequestException('Không tìm thấy người dùng với email này');
+
+  const otp = randomInt(100000, 999999).toString();
+  const expiresAt = addMinutes(new Date(), 10);
+
+  // Lưu OTP vào bảng user_otp_logs
+  await this.otpLogRepo.save(
+    this.otpLogRepo.create({ user, otp, expiresAt, used: false })
+  );
+
+  // Gửi mail OTP
+  await this.mailerService.sendMail({
+    to: user.email,
+    subject: 'Mã đặt lại mật khẩu',
+    template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
+    context: { name: user.name, otp },
+  });
+
+  return { message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn' };
+}
+
+/** ✅ Xác minh OTP quên mật khẩu */
+async verifyResetPasswordOtp(email: string, otp: string) {
+  const user = await this.userRepo.findOne({ where: { email } });
+  if (!user) throw new BadRequestException('Không tìm thấy người dùng');
+
+  const otpRecord = await this.otpLogRepo.findOne({
+    where: { user: { id: user.id }, otp, used: false },
+    order: { createdAt: 'DESC' },
+  });
+  if (!otpRecord) throw new BadRequestException('Mã OTP không hợp lệ');
+  if (isBefore(otpRecord.expiresAt, new Date())) throw new BadRequestException('Mã OTP đã hết hạn');
+
+  otpRecord.used = true;
+  otpRecord.usedAt = new Date();
+  await this.otpLogRepo.save(otpRecord);
+
+  return { message: 'Xác minh OTP thành công, bạn có thể đặt lại mật khẩu' };
+}
+
+/** ✅ Đặt lại mật khẩu mới */
+async resetPassword(email: string, newPassword: string) {
+  const user = await this.userRepo.findOne({ where: { email } });
+  if (!user) throw new BadRequestException('Không tìm thấy người dùng');
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  user.passwordHash = hash;
+
+  await this.userRepo.save(user);
+  return { message: 'Đặt lại mật khẩu thành công' };
+}
 }
