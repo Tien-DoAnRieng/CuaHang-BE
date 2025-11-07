@@ -15,10 +15,7 @@ Body (JSON):
 }
 Đăng nhập để lấy token (POST /auth/login)
 Body (JSON):
-{
-"email": "admin@example.com",
-"password": "changeme"
-}
+  
 Response: { "access_token": "jwt.token.here", "user": { ... } }
 
 Test POST /auth/register

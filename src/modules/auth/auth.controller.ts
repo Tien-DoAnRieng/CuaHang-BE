@@ -9,6 +9,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { ChangeRoleDto } from './dto/change-role.dto';
 import { RoleEnum } from '../../common/enums/role.enum';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+
 @ApiTags('Auth') // ✅ Nhóm endpoint trong Swagger
 @Controller('auth')
 export class AuthController {
@@ -95,4 +99,28 @@ async updateUserRole(
   const adminId = req.user.id;
   return this.authService.updateUserRole(adminId, userId, newRole);
 }
+@Post('forgot-password')
+@Public()
+@ApiOperation({ summary: 'Gửi mã OTP quên mật khẩu' })
+@ApiBody({ type: ForgotPasswordDto })
+async forgotPassword(@Body() dto: ForgotPasswordDto) {
+  return this.authService.sendResetPasswordOtp(dto.email);
+}
+
+@Post('verify-reset-otp')
+@Public()
+@ApiOperation({ summary: 'Xác minh mã OTP quên mật khẩu' })
+@ApiBody({ type: VerifyResetOtpDto })
+async verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
+  return this.authService.verifyResetPasswordOtp(dto.email, dto.otp);
+}
+
+@Post('reset-password')
+@Public()
+@ApiOperation({ summary: 'Đặt lại mật khẩu mới' })
+@ApiBody({ type: ResetPasswordDto })
+async resetPassword(@Body() dto: ResetPasswordDto) {
+  return this.authService.resetPassword(dto.email, dto.newPassword);
+}
+
 }

@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { typeOrmConfig } from './config/typeorm.config';
 import { UserModule } from './modules/user/user.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { ProductModule } from './modules/product/product.module';
 import { CartModule } from './modules/cart/cart.module';
 import { OrderModule } from './modules/order/order.module';
@@ -32,6 +33,7 @@ import { AddressModule } from './modules/order/adrees.module';
     TypeOrmModule.forRootAsync(typeOrmConfig),
   UserModule,
   ProductModule,
+  PaymentModule,
   CategoryModule,
   ProductImageModule,
   ProductVariantModule,
