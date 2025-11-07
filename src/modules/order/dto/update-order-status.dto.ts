@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum } from 'class-validator';
+import { OrderStatus } from '../../../common/enums/order-status.enum';
 
 export class UpdateOrderStatusDto {
-  @ApiProperty({ example: 'PROCESSING', description: 'Trạng thái mới của đơn hàng' })
-  status: string;
+  @IsEnum(OrderStatus)
+  @ApiProperty({ example: OrderStatus.PROCESSING, enum: OrderStatus, description: 'Trạng thái mới của đơn hàng' })
+  status: OrderStatus;
 }

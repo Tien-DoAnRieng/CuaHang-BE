@@ -12,6 +12,7 @@ import { RoleEnum } from '../../common/enums/role.enum';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
 @ApiTags('Auth') // ✅ Nhóm endpoint trong Swagger
 @Controller('auth')
 export class AuthController {
@@ -121,4 +122,5 @@ async verifyResetOtp(@Body() dto: VerifyResetOtpDto) {
 async resetPassword(@Body() dto: ResetPasswordDto) {
   return this.authService.resetPassword(dto.email, dto.newPassword);
 }
+
 }
