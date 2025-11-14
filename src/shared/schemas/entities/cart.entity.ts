@@ -4,7 +4,7 @@ import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { User } from '../../../shared/schemas/entities/user.entity';
 
 import { CartItem } from './cart-item.entity';
-
+import { Payment } from './payment.entity';
 @Entity('carts')
 export class Cart extends BaseEntity {
   @Column({ name: 'user_id' })
@@ -17,4 +17,7 @@ export class Cart extends BaseEntity {
 
   @OneToMany(() => CartItem, (cartItem: CartItem) => cartItem.cart)
   items: CartItem[];
+  
+  @OneToMany(() => Payment, payment => payment.order)
+  payments: Payment[];
 }

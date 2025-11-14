@@ -124,8 +124,6 @@ export class AuthService implements OnApplicationBootstrap {
     return { message: 'Xác thực thành công' };
   }
 
- 
-
   /** ✅ Đăng nhập user */
   async login(dto: LoginDto) {
     const user = await this.userRepo.findOne({
@@ -135,6 +133,12 @@ export class AuthService implements OnApplicationBootstrap {
 
     if (!user) throw new UnauthorizedException('Email không tồn tại');
     if (!user.isVerified) throw new UnauthorizedException('Tài khoản chưa xác thực email');
+
+    // ---- FIX: đảm bảo passwordHash không null trước khi bcrypt.compare
+    if (!user.passwordHash) {
+      // tài khoản này không có mật khẩu (ví dụ OAuth), không thể login bằng email/password
+      throw new UnauthorizedException('Tài khoản này không dùng mật khẩu. Vui lòng đăng nhập bằng OAuth.');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Mật khẩu không đúng');
@@ -148,8 +152,7 @@ export class AuthService implements OnApplicationBootstrap {
   }
 
   /** ✅ Admin cập nhật quyền người dùng */
-  async updateUserRole(adminId: string, userId: string, newRoleName: RoleEnum)
-{
+  async updateUserRole(adminId: string, userId: string, newRoleName: RoleEnum) {
     const admin = await this.userRepo.findOne({ where: { id: adminId }, relations: ['role'] });
     if (!admin || admin.role.name !== RoleEnum.ADMIN) {
       throw new ForbiddenException('Chỉ admin mới có thể chỉnh quyền');
@@ -166,57 +169,104 @@ export class AuthService implements OnApplicationBootstrap {
 
     return { message: `Đã đổi quyền của ${user.email} thành ${newRoleName}` };
   }
+
   async sendResetPasswordOtp(email: string) {
-  const user = await this.userRepo.findOne({ where: { email } });
-  if (!user) throw new BadRequestException('Không tìm thấy người dùng với email này');
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('Không tìm thấy người dùng với email này');
 
-  const otp = randomInt(100000, 999999).toString();
-  const expiresAt = addMinutes(new Date(), 10);
+    const otp = randomInt(100000, 999999).toString();
+    const expiresAt = addMinutes(new Date(), 10);
 
-  // Lưu OTP vào bảng user_otp_logs
-  await this.otpLogRepo.save(
-    this.otpLogRepo.create({ user, otp, expiresAt, used: false })
-  );
+    // Lưu OTP vào bảng user_otp_logs
+    await this.otpLogRepo.save(
+      this.otpLogRepo.create({ user, otp, expiresAt, used: false })
+    );
 
-  // Gửi mail OTP
-  await this.mailerService.sendMail({
-    to: user.email,
-    subject: 'Mã đặt lại mật khẩu',
-    template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
-    context: { name: user.name, otp },
-  });
+    // Gửi mail OTP
+    await this.mailerService.sendMail({
+      to: user.email,
+      subject: 'Mã đặt lại mật khẩu',
+      template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
+      context: { name: user.name, otp },
+    });
 
-  return { message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn' };
-}
+    return { message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn' };
+  }
 
-/** ✅ Xác minh OTP quên mật khẩu */
-async verifyResetPasswordOtp(email: string, otp: string) {
-  const user = await this.userRepo.findOne({ where: { email } });
-  if (!user) throw new BadRequestException('Không tìm thấy người dùng');
+  /** ✅ Xác minh OTP quên mật khẩu */
+  async verifyResetPasswordOtp(email: string, otp: string) {
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('Không tìm thấy người dùng');
 
-  const otpRecord = await this.otpLogRepo.findOne({
-    where: { user: { id: user.id }, otp, used: false },
-    order: { createdAt: 'DESC' },
-  });
-  if (!otpRecord) throw new BadRequestException('Mã OTP không hợp lệ');
-  if (isBefore(otpRecord.expiresAt, new Date())) throw new BadRequestException('Mã OTP đã hết hạn');
+    const otpRecord = await this.otpLogRepo.findOne({
+      where: { user: { id: user.id }, otp, used: false },
+      order: { createdAt: 'DESC' },
+    });
+    if (!otpRecord) throw new BadRequestException('Mã OTP không hợp lệ');
+    if (isBefore(otpRecord.expiresAt, new Date())) throw new BadRequestException('Mã OTP đã hết hạn');
 
-  otpRecord.used = true;
-  otpRecord.usedAt = new Date();
-  await this.otpLogRepo.save(otpRecord);
+    otpRecord.used = true;
+    otpRecord.usedAt = new Date();
+    await this.otpLogRepo.save(otpRecord);
 
-  return { message: 'Xác minh OTP thành công, bạn có thể đặt lại mật khẩu' };
-}
+    return { message: 'Xác minh OTP thành công, bạn có thể đặt lại mật khẩu' };
+  }
 
-/** ✅ Đặt lại mật khẩu mới */
-async resetPassword(email: string, newPassword: string) {
-  const user = await this.userRepo.findOne({ where: { email } });
-  if (!user) throw new BadRequestException('Không tìm thấy người dùng');
+  /** ✅ Đặt lại mật khẩu mới */
+  async resetPassword(email: string, newPassword: string) {
+    const user = await this.userRepo.findOne({ where: { email } });
+    if (!user) throw new BadRequestException('Không tìm thấy người dùng');
 
-  const hash = await bcrypt.hash(newPassword, 10);
-  user.passwordHash = hash;
+    const hash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = hash;
 
-  await this.userRepo.save(user);
-  return { message: 'Đặt lại mật khẩu thành công' };
-}
+    await this.userRepo.save(user);
+    return { message: 'Đặt lại mật khẩu thành công' };
+  }
+
+  /** Google OAuth login */
+  async googleLogin(req: any) {
+    if (!req.user) return { message: 'No user from Google' };
+
+    const { email, name = 'Google User' } = req.user;
+
+    // 🔍 Tìm user trong DB
+    let user = await this.userRepo.findOne({ where: { email }, relations: ['role'] });
+
+    // 🧱 Nếu chưa có → tạo mới
+    if (!user) {
+      let defaultRole = await this.roleRepo.findOne({
+        where: { name: RoleEnum.CUSTOMER }, // hoặc RoleEnum.USER theo enum của bạn
+      });
+
+      if (!defaultRole) {
+        defaultRole = this.roleRepo.create({ name: RoleEnum.CUSTOMER });
+        await this.roleRepo.save(defaultRole);
+      }
+
+      user = this.userRepo.create({
+        email,
+        name,
+        passwordHash: '', // Google login không cần mật khẩu (hoặc null)
+        isVerified: true,
+        role: defaultRole,
+      });
+
+      await this.userRepo.save(user);
+    }
+
+    // 🪪 Tạo JWT token
+    const secret = this.configService.get<string>('JWT_SECRET');
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role?.name,
+    }, { secret });
+
+    return {
+      message: 'Google login success',
+      user,
+      accessToken: token,
+    };
+  }
 }

@@ -1,5 +1,6 @@
-import { Controller, Post, Patch, Body, UseGuards, Param, Request } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Param, Request, Get, Req, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiParam, ApiBearerAuth} from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -123,4 +124,18 @@ async resetPassword(@Body() dto: ResetPasswordDto) {
   return this.authService.resetPassword(dto.email, dto.newPassword);
 }
 
+@Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Chuyển hướng đến Google để đăng nhập' })
+  @ApiResponse({ status: 302, description: 'Redirect đến Google' })
+  async googleAuth() {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Google callback sau khi đăng nhập' })
+  @ApiResponse({ status: 200, description: 'Đăng nhập Google thành công' })
+  async googleAuthRedirect(@Req() req) {
+    return this.authService.googleLogin(req);
+   
+  
 }

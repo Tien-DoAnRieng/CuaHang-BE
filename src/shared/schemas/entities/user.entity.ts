@@ -9,9 +9,10 @@ export class User extends BaseEntity {
 
   @Column({ unique: true })
   email: string;
+@Column({ name: 'password_hash', type: 'varchar', length: 255, nullable: true })
+passwordHash: string | null;
 
-  @Column({ name: 'password_hash' })
-  passwordHash: string;
+
 
   // ✅ Một user chỉ có 1 role
   @ManyToOne(() => Role, { eager: true }) 
