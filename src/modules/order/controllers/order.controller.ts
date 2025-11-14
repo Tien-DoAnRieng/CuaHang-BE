@@ -9,6 +9,8 @@ import {
   UseGuards,
   Patch,
   Req,
+  Header,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { OrderService } from '../services/order.service';
@@ -31,7 +33,11 @@ export class OrderController {
   @ApiOperation({ summary: 'User đặt hàng' })
   @ApiBody({ type: CreateOrderDto })
   @ApiResponse({ status: 201, description: 'Đặt hàng thành công' })
-  async placeOrder(@Body() dto: CreateOrderDto) {
+  async placeOrder(@Req() req: any, @Body() dto: CreateOrderDto) {
+    const userId = req.user?.id;
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    // ensure order uses authenticated user id (do not trust client-provided userId)
+    dto.userId = userId;
     return this.orderService.placeOrder(dto);
   }
 
@@ -75,6 +81,7 @@ export class OrderController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get(':id')
+  @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Admin lấy chi tiết đơn hàng' })
   @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng' })
   async findOne(@Param('id') id: string) {
