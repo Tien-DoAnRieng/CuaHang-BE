@@ -16,7 +16,7 @@ export class Payment extends BaseEntity {
   @Column({ name: 'payment_time' })
   paymentTime: Date;
 
-  @ManyToOne(() => Order)
+ @ManyToOne(() => Order, order => order.payments)
   @JoinColumn({ name: 'order_id' })
   order: Order;
 }
