@@ -1,13 +1,19 @@
 
-import { Controller, Get, Post, Body, Param, Delete, Put, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, Put, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
-import { CreateProductVariantDto } from './dto/create-product-variant.dto';
-import { UpdateProductVariantDto } from './dto/update-product-variant.dto';
+import { ProductVariant } from '../../../shared/schemas/entities/product-variant.entity';
+import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
+import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { Public } from '../../../common/decorators/public.decorator';
+import { RoleEnum } from '../../../common/enums/role.enum';
 
 @ApiTags('ProductVariant')
+@ApiBearerAuth('access-token')
 @Controller('product-variants')
 export class ProductVariantController {
   constructor(
@@ -15,6 +21,8 @@ export class ProductVariantController {
     private readonly variantRepository: Repository<ProductVariant>,
   ) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
   @Post()
   @ApiOperation({ summary: 'Tạo biến thể sản phẩm mới' })
   @ApiBody({ type: CreateProductVariantDto })
@@ -24,6 +32,7 @@ export class ProductVariantController {
     return this.variantRepository.save(variant);
   }
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách biến thể sản phẩm' })
   @ApiResponse({ status: 200, description: 'Danh sách biến thể sản phẩm.' })
@@ -31,6 +40,7 @@ export class ProductVariantController {
     return this.variantRepository.find({ where: query });
   }
 
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết biến thể sản phẩm' })
   @ApiResponse({ status: 200, description: 'Chi tiết biến thể sản phẩm.' })
@@ -39,6 +49,8 @@ export class ProductVariantController {
     return this.variantRepository.findOne({ where: { id } });
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật biến thể sản phẩm' })
   @ApiResponse({ status: 200, description: 'Cập nhật biến thể sản phẩm thành công.' })
@@ -49,6 +61,8 @@ export class ProductVariantController {
     return this.variantRepository.findOne({ where: { id } });
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa biến thể sản phẩm' })
   @ApiResponse({ status: 200, description: 'Xóa biến thể sản phẩm thành công.' })

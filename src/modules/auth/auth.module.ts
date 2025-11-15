@@ -14,8 +14,10 @@ import { JwtStrategy } from '../../common/strategies/jwt.strategy';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { QueueModule } from '../queue/queue.module';
 import { UserOtpLog } from '../../shared/schemas/entities/user-otp-log.entity';
+import { GoogleStrategy } from '../../common/strategies/google.strategy';
 @Module({
   imports: [
+    PassportModule.register({ defaultStrategy: 'google' }),
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forFeature([User, Role, UserOtpLog]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -54,6 +56,6 @@ template: {
     QueueModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy,GoogleStrategy],
 })
 export class AuthModule {}

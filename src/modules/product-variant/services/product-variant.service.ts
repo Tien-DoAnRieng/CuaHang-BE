@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
+import { ProductVariant } from '../../../shared/schemas/entities/product-variant.entity';
 
 @Injectable()
 export class ProductVariantService {

@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike, Between, MoreThanOrEqual, LessThanOrEqual, DeepPartial } from 'typeorm';
-import { Product } from '../../shared/schemas/entities/product.entity';
-import { Category } from '../../shared/schemas/entities/category.entity';
+import { Repository, DeepPartial } from 'typeorm';
+import { Product } from '../../../shared/schemas/entities/product.entity';
+import { Category } from '../../../shared/schemas/entities/category.entity';
 
 @Injectable()
 export class ProductService {
@@ -32,31 +32,48 @@ export class ProductService {
   }
 
   async findAll(query: any): Promise<{ data: Product[]; total: number; page: number; limit: number }> {
-    const { search, brand, category, status, minPrice, maxPrice, page = 1, limit = 10 } = query;
+    const { q, brand, category, status, page = 1, limit = 10 } = query;
 
-    const where: any = {};
+    const pageNum = Number(page) || 1;
+    const take = Number(limit) || 10;
+    const limitNum = Number(take);
 
-    if (search) where.name = ILike(`%${search}%`);
-    if (brand) where.brand = brand;
-    if (category) where.category = { id: category };
-    if (status) where.status = status;
-
-    if (minPrice && maxPrice) {
-      where.price = Between(minPrice, maxPrice);
-    } else if (minPrice) {
-      where.price = MoreThanOrEqual(minPrice);
-    } else if (maxPrice) {
-      where.price = LessThanOrEqual(maxPrice);
+    if (Number.isNaN(pageNum) || pageNum < 1) {
+      throw new BadRequestException('`page` must be a positive integer >= 1');
+    }
+    if (Number.isNaN(limitNum) || limitNum < 1) {
+      throw new BadRequestException('`limit` must be a positive integer >= 1');
     }
 
-    const [data, total] = await this.productRepository.findAndCount({
-      where,
-      relations: ['category'],
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const skip = (pageNum - 1) * limitNum;
 
-    return { data, total, page: Number(page), limit: Number(limit) };
+    const qb = this.productRepository.createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category');
+
+    if (q) {
+      const qLower = String(q).toLowerCase();
+      qb.andWhere('(LOWER(product.name) LIKE :q OR LOWER(product.description) LIKE :q)', { q: `%${qLower}%` });
+    }
+
+    if (brand) {
+      qb.andWhere('product.brand = :brand', { brand });
+    }
+
+    if (status) {
+      qb.andWhere('product.status = :status', { status });
+    }
+
+    if (category) {
+      // filter by category name (case-insensitive exact match)
+      qb.andWhere('LOWER(category.name) = :categoryName', { categoryName: String(category).toLowerCase() });
+    }
+
+    const [data, total] = await qb
+      .skip(skip)
+      .take(limitNum)
+      .getManyAndCount();
+
+    return { data, total, page: pageNum, limit: limitNum };
   }
 
   async findOne(id: string): Promise<Product | null> {

@@ -21,6 +21,10 @@ export class AddressService {
         return await this.addressRepository.find();
     }
 
+    async findByUser(userId: string): Promise<Address[]> {
+        return await this.addressRepository.find({ where: { userId } });
+    }
+
     async findOne(id: string): Promise<Address> {
         const address = await this.addressRepository.findOne({ where: { id } });
         if (!address) {

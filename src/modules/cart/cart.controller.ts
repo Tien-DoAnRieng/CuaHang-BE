@@ -1,46 +1,58 @@
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { CartService } from './cart.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Cart')
+@ApiBearerAuth('access-token')
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  @Get(':userId')
-  @ApiOperation({ summary: 'Lấy giỏ hàng của user' })
-  getCart(@Param('userId') userId: string) {
+  // Lấy giỏ hàng của người đang đăng nhập
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiOperation({ summary: 'Lấy giỏ hàng của user (me)' })
+  getMyCart(@Req() req: any) {
+    const userId = req.user?.id;
     return this.cartService.getUserCart(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('add')
-  @ApiOperation({ summary: 'Thêm sản phẩm vào giỏ hàng' })
+  @ApiOperation({ summary: 'Thêm sản phẩm vào giỏ hàng (user hiện tại)' })
   @ApiBody({ schema: {
       properties: {
-        userId: { type: 'string' },
         variantId: { type: 'string' },
         quantity: { type: 'number' },
       },
   }})
-  addItem(@Body() body: { userId: string; variantId: string; quantity: number }) {
-    return this.cartService.addItem(body.userId, body.variantId, body.quantity);
+  addItem(@Req() req: any, @Body() body: { variantId: string; quantity: number }) {
+    const userId = req.user?.id;
+    return this.cartService.addItem(userId, body.variantId, body.quantity);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Put('update')
-  @ApiOperation({ summary: 'Cập nhật số lượng sản phẩm trong giỏ' })
-  updateItem(@Body() body: { userId: string; variantId: string; quantity: number }) {
-    return this.cartService.updateItem(body.userId, body.variantId, body.quantity);
+  @ApiOperation({ summary: 'Cập nhật số lượng sản phẩm trong giỏ (user hiện tại)' })
+  updateItem(@Req() req: any, @Body() body: { variantId: string; quantity: number }) {
+    const userId = req.user?.id;
+    return this.cartService.updateItem(userId, body.variantId, body.quantity);
   }
 
-  @Delete(':userId/:variantId')
-  @ApiOperation({ summary: 'Xóa sản phẩm khỏi giỏ hàng' })
-  removeItem(@Param('userId') userId: string, @Param('variantId') variantId: string) {
+  @UseGuards(JwtAuthGuard)
+  @Delete(':variantId')
+  @ApiOperation({ summary: 'Xóa sản phẩm khỏi giỏ hàng (user hiện tại)' })
+  removeItem(@Req() req: any, @Param('variantId') variantId: string) {
+    const userId = req.user?.id;
     return this.cartService.removeItem(userId, variantId);
   }
 
-  @Delete('clear/:userId')
-  @ApiOperation({ summary: 'Xóa toàn bộ giỏ hàng của user' })
-  clearCart(@Param('userId') userId: string) {
+  @UseGuards(JwtAuthGuard)
+  @Delete('me')
+  @ApiOperation({ summary: 'Xóa toàn bộ giỏ hàng của user hiện tại' })
+  clearCart(@Req() req: any) {
+    const userId = req.user?.id;
     return this.cartService.clearCart(userId);
   }
 }

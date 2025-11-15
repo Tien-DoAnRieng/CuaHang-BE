@@ -20,7 +20,7 @@ import { QueueModule } from './modules/queue/queue.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { ReviewModule } from './modules/review/review.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
-
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ConfigService } from '@nestjs/config';
 import { AddressModule } from './modules/order/adrees.module';
 @Module({
@@ -45,7 +45,7 @@ import { AddressModule } from './modules/order/adrees.module';
   QueueModule,
   FileUploadModule,
   AddressModule,
-
+  DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

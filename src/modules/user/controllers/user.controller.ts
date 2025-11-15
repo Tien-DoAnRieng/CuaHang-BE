@@ -1,6 +1,7 @@
-import { Controller, Get, Query, Param, UseGuards, Delete } from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards, Delete, Req, Patch, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -49,5 +50,25 @@ export class UserController {
   async remove(@Param('id') id: string) {
     await this.userService.remove(id);
     return { success: true };
+  }
+
+  // Get current user's profile
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Lấy thông tin profile của chính mình' })
+  async getProfile(@Req() req: any) {
+    const userId = req.user?.id;
+    return this.userService.findOne(userId);
+  }
+
+  // Update current user's profile (name and/or password)
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Cập nhật profile của chính mình (đổi tên / đổi mật khẩu)' })
+  async updateProfile(@Req() req: any, @Body() dto: UpdateProfileDto) {
+    const userId = req.user?.id;
+    return this.userService.updateProfile(userId, dto);
   }
 }

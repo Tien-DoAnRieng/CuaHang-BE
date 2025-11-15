@@ -36,9 +36,8 @@ export class OrderController {
   async placeOrder(@Req() req: any, @Body() dto: CreateOrderDto) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException('User not authenticated');
-    // ensure order uses authenticated user id (do not trust client-provided userId)
-    dto.userId = userId;
-    return this.orderService.placeOrder(dto);
+    // call service with authenticated user id (do not trust client-provided userId)
+    return this.orderService.placeOrder(dto, userId);
   }
 
   // User: Cancel order
@@ -46,8 +45,11 @@ export class OrderController {
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'User huỷ đơn hàng' })
   @ApiResponse({ status: 200, description: 'Huỷ đơn hàng thành công' })
-  async cancelOrder(@Param('id') id: string) {
-    return this.orderService.cancelOrder(id);
+  async cancelOrder(@Req() req: any, @Param('id') id: string) {
+    const userId = req.user?.id;
+    const roles = req.user?.roles || [];
+    const isAdmin = Array.isArray(roles) && roles.includes(RoleEnum.ADMIN);
+    return this.orderService.cancelOrder(id, userId, isAdmin);
   }
 
   // User: Lấy danh sách đơn hàng của chính họ
