@@ -20,3 +20,4 @@ export class Payment extends BaseEntity {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 }
+

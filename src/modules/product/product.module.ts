@@ -9,8 +9,8 @@ import { ProductImage } from '../../shared/schemas/entities/product-image.entity
 
 import { ProductVariantModule } from '../product-variant/product-variant.module';
 import { ProductImageModule } from '../product-image/product-image.module';
-import { ProductController } from './product.controller';
-import { ProductService } from './product.service';
+import { ProductController } from './controllers/product.controller';
+import { ProductService } from './services/product.service';
 
 import { ColorController } from './controllers/color.controller';
 import { ColorService } from './services/color.service';

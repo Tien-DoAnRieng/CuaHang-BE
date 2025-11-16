@@ -236,3 +236,4 @@ runSeed().catch(err => {
   console.error('❌ Lỗi khi seed:', err);
   process.exit(1);
 });
+

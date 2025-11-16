@@ -28,3 +28,4 @@ export class CustomerStatsDto {
   @ApiProperty() newCustomers: number;
   @ApiProperty() returningCustomers: number;
 }
+

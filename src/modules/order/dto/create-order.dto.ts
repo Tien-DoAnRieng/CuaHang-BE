@@ -2,10 +2,6 @@ import { IsString, IsNumber, IsArray, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateOrderDto {
-  @IsString()
-  @ApiProperty({ example: 'uuid-user' })
-  userId: string;
-
   @IsNumber()
   @ApiProperty({ example: 100000 })
   totalAmount: number;
