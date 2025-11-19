@@ -1,11 +1,11 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional,IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreatePaymentDto {
   @IsString()
   @ApiProperty({ example: 'uuid-order', description: 'ID của đơn hàng cần thanh toán' })
   orderId: string;
-
+ 
   @IsString()
   @ApiProperty({ example: 'CREDIT_CARD', description: 'Phương thức thanh toán' })
   paymentMethod: string;
