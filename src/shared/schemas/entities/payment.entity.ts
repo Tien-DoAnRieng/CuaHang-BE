@@ -6,18 +6,22 @@ import { Order } from './order.entity';
 export class Payment extends BaseEntity {
   @Column({ name: 'order_id' })
   orderId: string;
+ 
 
-  @Column({ name: 'payment_method' })
+  @Column({ name: 'payment_method', nullable: true })
   paymentMethod: string;
 
   @Column()
   status: string;
 
-  @Column({ name: 'payment_time' })
+  @Column({ name: 'payment_time', type: 'timestamp', nullable: true  })
   paymentTime: Date;
 
  @ManyToOne(() => Order, order => order.payments)
   @JoinColumn({ name: 'order_id' })
   order: Order;
+
+
+
 }
 

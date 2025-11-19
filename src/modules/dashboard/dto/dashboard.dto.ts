@@ -28,4 +28,25 @@ export class CustomerStatsDto {
   @ApiProperty() newCustomers: number;
   @ApiProperty() returningCustomers: number;
 }
+export class WeeklyGrowthDto {
+  @ApiProperty() week: number;
+  @ApiProperty() revenue: number;
+  @ApiProperty() growthRate: number;
+}
+export interface MonthlyRevenue {
+  month: number;
+  total: number;
+}
 
+export interface CustomerStats {
+  month: string;
+  total: number;
+  newCustomers: number;
+  returningCustomers: number;
+}
+
+export interface WeeklyGrowth {
+  week: number;
+  revenue: number;
+  growthRate: number;
+}

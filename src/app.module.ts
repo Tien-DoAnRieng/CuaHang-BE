@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import cloudinaryConfig from './config/cloudinary.config';
+import vnpayConfig from './config/vnpay.config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -15,7 +16,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { CategoryModule } from './modules/category/category.module';
 import { ProductImageModule } from './modules/product-image/product-image.module';
 import { ProductVariantModule } from './modules/product-variant/product-variant.module';
-
+import { BannerModule } from './modules/banner/banner.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { FileUploadModule } from './modules/file-upload/file-upload.module';
 import { ReviewModule } from './modules/review/review.module';
@@ -28,7 +29,7 @@ import { AddressModule } from './modules/order/adrees.module';
 
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [cloudinaryConfig],
+      load: [cloudinaryConfig,vnpayConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
   UserModule,
@@ -46,6 +47,7 @@ import { AddressModule } from './modules/order/adrees.module';
   FileUploadModule,
   AddressModule,
   DashboardModule,
+  BannerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

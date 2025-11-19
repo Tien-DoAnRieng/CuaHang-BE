@@ -6,11 +6,13 @@ import { Order } from '../../shared/schemas/entities/order.entity';
 import { PaymentService } from './services/payment.service';
 import { MomoService } from './services/momo.service';
 import { PaymentController } from './controllers/payment.controller';
+import { VnpayService } from './services/vnpay.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Payment, Order]), HttpModule],
   controllers: [PaymentController],
-  providers: [PaymentService, MomoService],
-  exports: [PaymentService, MomoService],
+  providers: [PaymentService, MomoService, VnpayService],
+  exports: [PaymentService, MomoService, VnpayService], // thêm VnpayService vào đây
 })
 export class PaymentModule {}
+

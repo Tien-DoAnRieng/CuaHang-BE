@@ -3,83 +3,84 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../../shared/schemas/entities/order.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
-import { Product } from '../../shared/schemas/entities/product.entity';
-import { Category } from '../../shared/schemas/entities/category.entity';
 import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
+import * as ExcelJS from 'exceljs';
+import { parseISO, startOfWeek, endOfWeek } from 'date-fns';
+import {
+  OverviewDto,
+  MonthlyRevenueDto,
+  CategoryRevenueDto,
+  CustomerStatsDto,
+  WeeklyGrowthDto,
+} from './dto/dashboard.dto';
 
 @Injectable()
 export class DashboardService {
   constructor(
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(Product) private productRepo: Repository<Product>,
-    @InjectRepository(Category) private categoryRepo: Repository<Category>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
   ) {}
 
-  // 🧮 1. Tổng quan
-  async getOverview() {
-  const currentMonth = new Date().getMonth() + 1;
-  const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  // ===== Overview =====
+  async getOverview(): Promise<OverviewDto> {
+    const currentMonth = new Date().getMonth() + 1;
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
 
-  const currentRevenue = await this.getMonthlyRevenueValue(currentMonth);
-  const lastRevenue = await this.getMonthlyRevenueValue(lastMonth);
-  const totalOrders = await this.orderRepo.count();
-  const totalCustomers = await this.userRepo.count();
+    const currentRevenue = await this.getMonthlyRevenueValue(currentMonth);
+    const lastRevenue = await this.getMonthlyRevenueValue(lastMonth);
 
-  const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
+    const totalOrders = await this.orderRepo.count();
+    const totalCustomers = await this.userRepo.count();
 
-  return {
-    totalRevenue: currentRevenue,
-    revenueGrowth,
-    totalOrders,
-    ordersGrowth: revenueGrowth,
-    totalCustomers,
-    customersGrowth: 0, // nếu chưa tính khách mới
-    totalGrowth: revenueGrowth,
-  };
-}
+    const revenueGrowth =
+      lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
 
+    return {
+      totalRevenue: currentRevenue,
+      revenueGrowth,
+      totalOrders,
+      ordersGrowth: revenueGrowth,
+      totalCustomers,
+      customersGrowth: 0,
+      totalGrowth: revenueGrowth,
+    };
+  }
 
   private async getMonthlyRevenueValue(month: number): Promise<number> {
     const year = new Date().getFullYear();
     const result = await this.orderRepo
       .createQueryBuilder('order')
       .select('SUM(order.totalAmount)', 'total')
-      .where('MONTH(order.createdAt) = :month', { month })
-      .andWhere('YEAR(order.createdAt) = :year', { year })
+      .where('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+      .andWhere('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
       .getRawOne();
-
     return Number(result?.total || 0);
   }
 
-  // 📈 2. Doanh thu theo tháng
-async getMonthlyRevenue() {
-  const year = new Date().getFullYear();
+  // ===== Monthly Revenue =====
+  async getMonthlyRevenue(): Promise<MonthlyRevenueDto[]> {
+    const year = new Date().getFullYear();
+    const result = await this.orderRepo
+      .createQueryBuilder('order')
+      .select('EXTRACT(MONTH FROM order.createdAt)', 'month')
+      .addSelect('SUM(order.totalAmount)', 'actual')
+      .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+      .groupBy('month')
+      .orderBy('month', 'ASC')
+      .getRawMany();
 
-  const result = await this.orderRepo
-    .createQueryBuilder('order')
-    .select('MONTH(order.createdAt)', 'month')
-    .addSelect('SUM(order.totalAmount)', 'actual')
-    .where('YEAR(order.createdAt) = :year', { year })
-    .groupBy('MONTH(order.createdAt)')
-    .orderBy('month', 'ASC')
-    .getRawMany();
-
-  // tạo đủ 12 tháng, nếu tháng nào chưa có -> gán 0
-  const data: { month: number; actual: number; target: number }[] = [];
-  for (let i = 1; i <= 12; i++) {
-    const found = result.find(r => Number(r.month) === i);
-    const actual = found ? Number(found.actual) : 0;
-    const target = 140000000 / 12; // ví dụ mục tiêu chia đều
-    data.push({ month: i, actual, target });
+    const data: MonthlyRevenueDto[] = [];
+    for (let i = 1; i <= 12; i++) {
+      const found = result.find((r) => Number(r.month) === i);
+      const actual = found ? Number(found.actual) : 0;
+      data.push({ month: i, actual, target: 140_000_000 / 12 });
+    }
+    return data;
   }
-  return data;
-}
 
-
-  // 📊 3. Phân bổ doanh thu theo danh mục
-  async getRevenueByCategory() {
+  // ===== Category Revenue =====
+  async getRevenueByCategory(): Promise<CategoryRevenueDto[]> {
     const result = await this.orderItemRepo
       .createQueryBuilder('item')
       .leftJoin('item.variant', 'variant')
@@ -98,99 +99,158 @@ async getMonthlyRevenue() {
     }));
   }
 
-  // 👥 4. Thống kê khách hàng
-  async getCustomerStats() {
-  const year = new Date().getFullYear();
-
-  const result = await this.userRepo
-    .createQueryBuilder('user')
-    .select('MONTH(user.createdAt)', 'month')
-    .addSelect('COUNT(user.id)', 'total')
-    .where('YEAR(user.createdAt) = :year', { year })
-    .groupBy('MONTH(user.createdAt)')
-    .orderBy('month', 'ASC')
-    .getRawMany();
-
-  const data: { month: string; total: number; newCustomers: number; returningCustomers: number }[] = [];
-  for (let i = 1; i <= 12; i++) {
-    const found = result.find(r => Number(r.month) === i);
-    const total = found ? Number(found.total) : 0;
-    data.push({
-      month: `Tháng ${i}`,
-      total,
-      newCustomers: total, // nếu bạn chưa tách logic khách quay lại
-      returningCustomers: 0,
-    });
-  }
-
-  return data;
-}
-
-
-  // 📆 5. Tăng trưởng doanh thu theo tuần
-  async getWeeklyGrowth() {
-  const now = new Date();
-  const past = new Date();
-  past.setDate(now.getDate() - 28); // 4 tuần trước
-
-  const result = await this.orderRepo
-    .createQueryBuilder('order')
-    .select("YEARWEEK(order.createdAt, 1)", "yearWeek")
-    .addSelect("SUM(order.totalAmount)", "revenue")
-    .where("order.createdAt BETWEEN :past AND :now", { past, now })
-    .groupBy("YEARWEEK(order.createdAt, 1)")
-    .orderBy("yearWeek", "ASC")
-    .getRawMany();
-
-  const data = result.map((r, i) => {
-    const revenue = Number(r.revenue);
-    const prev = i > 0 ? Number(result[i - 1].revenue) : 0;
-    const growthRate = prev > 0 ? ((revenue - prev) / prev) * 100 : 0;
-    return {
-      week: i + 1,
-      revenue,
-      growthRate: +growthRate.toFixed(2),
-    };
-  });
-
-  return data;
-}
-
-
-  // 🧾 6. Đơn hàng gần đây
-  async getRecentOrders() {
-    const orders = await this.orderRepo.find({
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
-      take: 5,
-    });
-
-    return orders.map((o) => ({
-      orderId: o.id,
-      customerName: o.user?.name || 'Khách hàng',
-      totalAmount: Number(o.totalAmount),
-      status: o.status,
-    }));
-  }
-
-  // 🛍️ 7. Sản phẩm bán chạy
-  async getTopProducts() {
-    const result = await this.orderItemRepo
-      .createQueryBuilder('item')
-      .leftJoin('item.variant', 'variant')
-      .leftJoin('variant.product', 'product')
-      .select('product.name', 'productName')
-      .addSelect('SUM(item.quantity)', 'sold')
-      .addSelect('AVG(item.priceAtTime)', 'price')
-      .groupBy('product.name')
-      .orderBy('SUM(item.quantity)', 'DESC')
-      .limit(5)
+  // ===== Customer Stats =====
+  async getCustomerStats(): Promise<CustomerStatsDto[]> {
+    const year = new Date().getFullYear();
+    const result = await this.userRepo
+      .createQueryBuilder('user')
+      .select('EXTRACT(MONTH FROM user.createdAt)', 'month')
+      .addSelect('COUNT(user.id)', 'total')
+      .where('EXTRACT(YEAR FROM user.createdAt) = :year', { year })
+      .groupBy('month')
+      .orderBy('month', 'ASC')
       .getRawMany();
 
-    return result.map((r) => ({
-      productName: r.productName,
-      sold: Number(r.sold),
-      price: Number(r.price),
-    }));
+    const data: CustomerStatsDto[] = [];
+    for (let i = 1; i <= 12; i++) {
+      const found = result.find((r) => Number(r.month) === i);
+      const total = found ? Number(found.total) : 0;
+      data.push({
+        month: `Tháng ${i}`,
+        total,
+        newCustomers: total,
+        returningCustomers: 0,
+      });
+    }
+    return data;
   }
+
+  // ===== Weekly Growth =====
+  async getWeeklyGrowth(): Promise<WeeklyGrowthDto[]> {
+    const now = new Date();
+    const past = new Date();
+    past.setDate(now.getDate() - 28);
+
+    const result = await this.orderRepo
+      .createQueryBuilder('order')
+      .select('EXTRACT(WEEK FROM order.createdAt)', 'week')
+      .addSelect('SUM(order.totalAmount)', 'revenue')
+      .where('order.createdAt BETWEEN :past AND :now', { past, now })
+      .groupBy('week')
+      .orderBy('week', 'ASC')
+      .getRawMany();
+
+    return result.map((r, i) => {
+      const revenue = Number(r.revenue);
+      const prev = i > 0 ? Number(result[i - 1].revenue) : 0;
+      return {
+        week: Number(r.week),
+        revenue,
+        growthRate: prev > 0 ? +(((revenue - prev) / prev) * 100).toFixed(2) : 0,
+      };
+    });
+  }
+
+  // ===== Recent Orders =====
+  async getRecentOrders() {
+    return this.orderRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.user', 'user')
+      .orderBy('order.createdAt', 'DESC')
+      .limit(5)
+      .getMany();
+  }
+
+// ===== Export Revenue Excel =====
+async exportRevenueExcel(
+  type: 'month' | 'year' | 'week',
+  months?: number[],
+  years?: number[],
+  weeks?: number[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Revenue');
+
+  sheet.addRow(['Month/Week/Year', 'Revenue', 'Target']);
+
+  if (type === 'month') {
+    const data = await this.getMonthlyRevenue();
+    data.forEach(d => {
+      if (!months || months.includes(d.month)) {
+        sheet.addRow([d.month, d.actual, d.target]);
+      }
+    });
+  }
+
+  if (type === 'year') {
+    const currentYear = new Date().getFullYear();
+    const yearsArr = years && years.length ? years : [currentYear];
+    for (const year of yearsArr) {
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('SUM(order.totalAmount)', 'total')
+        .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+        .getRawOne();
+      sheet.addRow([year, Number(result?.total || 0), 0]);
+    }
+  }
+
+  if (type === 'week') {
+    const data = await this.getWeeklyGrowth();
+    data.forEach(d => {
+      if (!weeks || weeks.includes(d.week)) {
+        sheet.addRow([d.week, d.revenue, 0]);
+      }
+    });
+  }
+
+  // Chuyển ArrayBuffer sang Node Buffer
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// ===== Export Orders Excel =====
+async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Orders');
+  sheet.addRow(['Order ID', 'Customer', 'Amount', 'Created At']);
+
+  const referenceDate = parseISO(date);
+  let ordersQuery = this.orderRepo
+    .createQueryBuilder('order')
+    .leftJoinAndSelect('order.user', 'user');
+
+  if (type === 'day') {
+    const dayStart = new Date(referenceDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(referenceDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    ordersQuery = ordersQuery.where('order.createdAt BETWEEN :start AND :end', {
+      start: dayStart,
+      end: dayEnd,
+    });
+  } else if (type === 'week') {
+    const start = startOfWeek(referenceDate, { weekStartsOn: 1 });
+    const end = endOfWeek(referenceDate, { weekStartsOn: 1 });
+    ordersQuery = ordersQuery.where('order.createdAt BETWEEN :start AND :end', {
+      start,
+      end,
+    });
+  } else if (type === 'month') {
+    const month = referenceDate.getMonth() + 1;
+    const year = referenceDate.getFullYear();
+    ordersQuery = ordersQuery
+      .where('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+      .andWhere('EXTRACT(YEAR FROM order.createdAt) = :year', { year });
+  }
+
+  const orders = await ordersQuery.getMany();
+  orders.forEach(o => {
+    sheet.addRow([o.id, o.user.name, o.totalAmount, o.createdAt]);
+  });
+
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
 }
