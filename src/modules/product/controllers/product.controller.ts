@@ -8,11 +8,15 @@ import {
   Put,
   Query,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
+import { ProductImportService } from '../services/product-import.service';
 import { Product } from '../../../shared/schemas/entities/product.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -23,7 +27,10 @@ import { Public } from '../../../common/decorators/public.decorator';
 @ApiBearerAuth('access-token')
 @Controller('products')
 export class ProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(
+    private readonly productService: ProductService,
+    private readonly productImportService: ProductImportService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,6 +40,28 @@ export class ProductController {
   @ApiResponse({ status: 201, description: 'Tạo mới sản phẩm thành công.' })
   create(@Body() data: CreateProductDto) {
     return this.productService.create(data);
+  }
+
+  @Post('import')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Import products from Excel (XLSX/CSV) - admin' })
+  async import(@UploadedFile() file: Express.Multer.File) {
+    if (!file || !file.buffer) {
+      return { error: 'No file uploaded' };
+    }
+    const result = await this.productImportService.importFromFile(file);
+    return result;
   }
 
   @Public()
