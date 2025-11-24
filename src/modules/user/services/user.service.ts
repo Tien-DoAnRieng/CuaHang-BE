@@ -71,12 +71,12 @@ export class UserService {
   /** User cập nhật profile (tên + đổi mật khẩu) */
   async updateProfile(
     userId: string,
-    dto: { name?: string; currentPassword?: string; newPassword?: string; confirmNewPassword?: string },
+    dto: { name?: string; currentPassword?: string; newPassword?: string; confirmNewPassword?: string; phone?: string; gender?: 'MALE' | 'FEMALE' | 'OTHER' },
   ): Promise<any> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const { name, currentPassword, newPassword, confirmNewPassword } = dto;
+    const { name, currentPassword, newPassword, confirmNewPassword, phone, gender } = dto;
 
     if (newPassword) {
       // require currentPassword
@@ -94,6 +94,16 @@ export class UserService {
     }
 
     if (name) user.name = name;
+
+    if (phone !== undefined) {
+      user.phone = phone || null;
+    }
+
+    if (gender !== undefined) {
+      const allowed = ['MALE', 'FEMALE', 'OTHER'];
+      if (gender && !allowed.includes(gender)) throw new BadRequestException('gender must be one of MALE, FEMALE, OTHER');
+      user.gender = gender || null;
+    }
 
     return this.usersRepository.save(user);
   }
