@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import { ProductImportService } from '../services/product-import.service';
+import { ProductAnalyticsService } from '../services/product-analytics.service';
 import { Product } from '../../../shared/schemas/entities/product.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -30,6 +31,7 @@ export class ProductController {
   constructor(
     private readonly productService: ProductService,
     private readonly productImportService: ProductImportService,
+    private readonly productAnalyticsService: ProductAnalyticsService,
   ) {}
 
   @Post()
@@ -65,6 +67,17 @@ export class ProductController {
   }
 
   @Public()
+  @Get('top-selling')
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Last N days to consider' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm bán chạy (top-selling)' })
+  async topSelling(@Query('limit') limit?: number, @Query('days') days?: number, @Query('categoryId') categoryId?: string) {
+    const l = limit ? Number(limit) : 10;
+    const d = days ? Number(days) : undefined;
+    return this.productAnalyticsService.getTopSelling({ limit: l, days: d, categoryId });
+  }
+
   @Get()
   @ApiQuery({ name: 'q', required: false, description: 'Từ khóa tìm kiếm (tên, mô tả)' })
   @ApiQuery({ name: 'page', required: false, description: 'Số trang (pagination)', type: Number })
@@ -116,5 +129,21 @@ export class ProductController {
   @ApiResponse({ status: 200, description: 'Xóa sản phẩm thành công.' })
   remove(@Param('id') id: string) {
     return this.productService.remove(id);
+  }
+  // Admin: top-selling with pagination & date range
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Get('admin/top-selling')
+  @ApiBearerAuth('access-token')
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'from', required: false, description: 'From date (ISO or DD/MM/YYYY)' })
+  @ApiQuery({ name: 'to', required: false, description: 'To date (ISO or DD/MM/YYYY)' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiOperation({ summary: 'Admin: Lấy top sản phẩm bán chạy (phân trang, date range)' })
+  async topSellingAdmin(@Query('page') page?: number, @Query('limit') limit?: number, @Query('from') from?: string, @Query('to') to?: string, @Query('categoryId') categoryId?: string) {
+    const p = page ? Number(page) : 1;
+    const l = limit ? Number(limit) : 20;
+    return this.productAnalyticsService.getTopSellingAdmin({ page: p, limit: l, from, to, categoryId });
   }
 }

@@ -35,4 +35,9 @@ export class UpdateProfileDto {
   @IsIn(['MALE', 'FEMALE', 'OTHER'])
   @ApiPropertyOptional({ example: 'MALE', enum: ['MALE', 'FEMALE', 'OTHER'], description: 'Giới tính' })
   gender?: 'MALE' | 'FEMALE' | 'OTHER';
+
+  @IsOptional()
+  @Matches(/^(?:\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})$/, { message: 'dateOfBirth must be YYYY-MM-DD or DD/MM/YYYY' })
+  @ApiPropertyOptional({ example: '20/05/1990', description: 'Ngày sinh (ISO YYYY-MM-DD hoặc DD/MM/YYYY)' })
+  dateOfBirth?: string;
 }
