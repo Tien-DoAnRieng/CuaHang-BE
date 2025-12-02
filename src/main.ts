@@ -7,8 +7,14 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ✅ Bật CORS (để Swagger và Frontend gọi API được)
-  app.enableCors();
+  // ✅ Bật CORS (để Swagger và Frontend gọi API được).
+  // Khi frontend gửi request kèm credentials, Access-Control-Allow-Origin
+  // KHÔNG được là wildcard '*'. Đặt origin cụ thể hoặc đọc từ env.
+  const FRONTEND_ORIGIN = process.env.FRONTEND_URL || process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+  app.enableCors({
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
+  });
 
 
   app.useGlobalPipes(

@@ -267,6 +267,7 @@ export class AuthService implements OnApplicationBootstrap {
       message: 'Google login success',
       user,
       accessToken: token,
+      access_token: token,
     };
   }
 }

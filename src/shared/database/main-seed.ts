@@ -14,6 +14,7 @@ import { OrderItem } from '../schemas/entities/order-item.entity';
 import { Payment } from '../schemas/entities/payment.entity';
 import { RoleEnum } from '../../common/enums/role.enum';
 
+
 // Hàm đọc biến môi trường
 const get = (key: string, defaultValue?: string) =>
   process.env[key] ?? defaultValue ?? '';
@@ -59,6 +60,7 @@ const AppDataSource = new DataSource({
     Order,
     OrderItem,
     Payment,
+
   ],
   synchronize: true,
   logging: false,
@@ -70,7 +72,7 @@ async function runSeed() {
 
   // Repositories
   const roleRepo = AppDataSource.getRepository(Role);
-  const colorRepo = AppDataSource.getRepository(Color);
+const colorRepo = AppDataSource.getRepository(Color);
   const sizeRepo = AppDataSource.getRepository(Size);
   const userRepo = AppDataSource.getRepository(User);
   const categoryRepo = AppDataSource.getRepository(Category);
@@ -156,7 +158,7 @@ async function runSeed() {
   const allVariants: ProductVariant[] = [];
   for (const product of products) {
     const count = faker.number.int({ min: 2, max: 3 });
-    for (let i = 0; i < count; i++) {
+for (let i = 0; i < count; i++) {
       const variant = variantRepo.create({
         product,
         color: faker.helpers.arrayElement(colors),
@@ -236,4 +238,3 @@ runSeed().catch(err => {
   console.error('❌ Lỗi khi seed:', err);
   process.exit(1);
 });
-

@@ -19,6 +19,14 @@ export class CartController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('check-availability')
+  @ApiOperation({ summary: 'Kiểm tra tồn kho các sản phẩm trong giỏ (trước khi thanh toán)' })
+  checkAvailability(@Req() req: any) {
+    const userId = req.user?.id;
+    return this.cartService.checkAvailability(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('add')
   @ApiOperation({ summary: 'Thêm sản phẩm vào giỏ hàng (user hiện tại)' })
   @ApiBody({ schema: {

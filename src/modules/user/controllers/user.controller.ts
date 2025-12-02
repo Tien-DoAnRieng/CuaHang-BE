@@ -27,31 +27,6 @@ export class UserController {
   }
 
   // Admin: get user detail
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @Get(':id')
-  @ApiBearerAuth('access-token')
-  @ApiParam({ name: 'id', required: true })
-  @ApiOperation({ summary: 'Admin: Lấy chi tiết user theo id' })
-  @ApiResponse({ status: 200, description: 'Chi tiết user' })
-  async findOne(@Param('id') id: string) {
-    return this.userService.findOne(id);
-  }
-
-  
-  // Admin: xóa user
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @Delete(':id')
-  @ApiBearerAuth('access-token')
-  @ApiParam({ name: 'id', required: true })
-  @ApiOperation({ summary: 'Admin: Xóa user theo id' })
-  @ApiResponse({ status: 200, description: 'User đã bị xóa' })
-  async remove(@Param('id') id: string) {
-    await this.userService.remove(id);
-    return { success: true };
-  }
-
   // Get current user's profile
   @UseGuards(JwtAuthGuard)
   @Get('me')
@@ -70,5 +45,30 @@ export class UserController {
   async updateProfile(@Req() req: any, @Body() dto: UpdateProfileDto) {
     const userId = req.user?.id;
     return this.userService.updateProfile(userId, dto);
+  }
+
+  // Admin: get user detail
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Get(':id')
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'id', required: true })
+  @ApiOperation({ summary: 'Admin: Lấy chi tiết user theo id' })
+  @ApiResponse({ status: 200, description: 'Chi tiết user' })
+  async findOne(@Param('id') id: string) {
+    return this.userService.findOne(id);
+  }
+
+  // Admin: xóa user
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Delete(':id')
+  @ApiBearerAuth('access-token')
+  @ApiParam({ name: 'id', required: true })
+  @ApiOperation({ summary: 'Admin: Xóa user theo id' })
+  @ApiResponse({ status: 200, description: 'User đã bị xóa' })
+  async remove(@Param('id') id: string) {
+    await this.userService.remove(id);
+    return { success: true };
   }
 }
