@@ -13,7 +13,8 @@ import { ProductVariant } from 'src/shared/schemas/entities/product-variant.enti
 import { Address } from 'src/shared/schemas/entities/address.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, User, Product, Category, OrderItem ,Product, Category,Payment,ProductImage,ProductVariant,Address])],
+  imports: [TypeOrmModule.forFeature([Order, User, Product, Category, OrderItem, Payment, ProductImage, ProductVariant, Address])
+],
   controllers: [DashboardController],
   providers: [DashboardService],
   exports: [DashboardService],

@@ -50,3 +50,25 @@ export interface WeeklyGrowth {
   revenue: number;
   growthRate: number;
 }
+export class DailyRevenueDto {
+  @ApiProperty({ description: 'Ngày trong tháng' })
+  day: number;
+
+  @ApiProperty({ description: 'Doanh thu thực tế' })
+  actual: number;
+
+  @ApiProperty({ description: 'Mục tiêu (nếu có)', required: false })
+  target: number;
+}
+
+// Doanh thu theo năm
+export class YearlyRevenueDto {
+  @ApiProperty({ description: 'Năm' })
+  year: number;
+
+  @ApiProperty({ description: 'Doanh thu thực tế' })
+  actual: number;
+
+  @ApiProperty({ description: 'Mục tiêu (nếu có)', required: false })
+  target: number;
+}

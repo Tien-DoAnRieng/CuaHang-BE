@@ -16,7 +16,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
 
   
   synchronize: true,
-    logging: get('DB_LOGGING', false),
+    logging: false,
   
     // Cấu hình encoding và tối ưu kết nối
     charset: 'utf8mb4',

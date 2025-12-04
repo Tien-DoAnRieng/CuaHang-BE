@@ -24,6 +24,8 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ConfigService } from '@nestjs/config';
 import { AddressModule } from './modules/order/adrees.module';
+import { FlashSaleModule } from './modules/flash-sale/flash-sale.module';
+import { ColorSizeModule } from './modules/color-size/color-size.module';
 @Module({
   imports: [
 
@@ -48,6 +50,8 @@ import { AddressModule } from './modules/order/adrees.module';
   AddressModule,
   DashboardModule,
   BannerModule,
+  FlashSaleModule,
+  ColorSizeModule
   ],
   controllers: [AppController],
   providers: [AppService],
