@@ -8,8 +8,6 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
-
-  // Lấy giỏ hàng của người đang đăng nhập
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiOperation({ summary: 'Lấy giỏ hàng của user (me)' })

@@ -18,8 +18,6 @@ export class CartService {
       where: { userId },
       relations: ['items', 'items.variant'],
     });
-
-    // Nếu chưa có giỏ hàng thì tạo mới
     if (!cart) {
       cart = this.cartRepo.create({ userId });
       await this.cartRepo.save(cart);
@@ -27,8 +25,6 @@ export class CartService {
 
     return cart;
   }
-
-  /** Kiểm tra tồn kho cho các items trong giỏ của user */
   async checkAvailability(userId: string) {
     const cart = await this.getUserCart(userId);
     const items = cart.items || [];

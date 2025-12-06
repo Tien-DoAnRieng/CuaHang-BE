@@ -1,6 +1,6 @@
-import { Column, Entity, BeforeInsert } from 'typeorm';
+import { Column, Entity, BeforeInsert,OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
-
+import { ColorSize } from './color-size.entity';
 @Entity('colors')
 export class Color extends BaseEntity {
   @Column({ length: 100 })
@@ -21,4 +21,7 @@ export class Color extends BaseEntity {
     super();
     Object.assign(this, partial);
   }
+  @OneToMany(() => ColorSize, cs => cs.color)
+sizes: ColorSize[];
+
 }

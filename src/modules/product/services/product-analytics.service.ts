@@ -10,13 +10,6 @@ export class ProductAnalyticsService {
     @InjectRepository(OrderItem)
     private readonly orderItemRepository: Repository<OrderItem>,
   ) {}
-
-  /**
-   * Get top selling products aggregated by product (summing order item quantities).
-   * - limit: number of products to return
-   * - days: optional time window (last N days)
-   * - categoryId: optional filter by product.category_id
-   */
   async getTopSelling({ limit = 10, days, categoryId }: { limit?: number; days?: number; categoryId?: string }) {
     const statuses = [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED];
 
@@ -44,8 +37,6 @@ export class ProductAnalyticsService {
     }
 
     const rows = await qb.getRawMany();
-
-    // normalize numeric fields
     return rows.map(r => ({
       productId: r.productId,
       name: r.name,
@@ -54,8 +45,6 @@ export class ProductAnalyticsService {
       sold: Number(r.sold),
     }));
   }
-
-  /** Admin version: supports pagination, date range, revenue and main image */
   async getTopSellingAdmin({ page = 1, limit = 20, from, to, categoryId }: { page?: number; limit?: number; from?: string; to?: string; categoryId?: string }) {
     const statuses = [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED];
 
@@ -90,8 +79,6 @@ export class ProductAnalyticsService {
     if (categoryId) qb.andWhere('p.category_id = :cat', { cat: categoryId });
 
     const rows = await qb.getRawMany();
-
-    // Count total distinct products matching filters
     const countQb = this.orderItemRepository.createQueryBuilder('oi')
       .innerJoin('product_variants', 'pv', 'oi.variant_id = pv.id')
       .innerJoin('products', 'p', 'pv.product_id = p.id')

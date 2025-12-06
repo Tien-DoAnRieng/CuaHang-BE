@@ -13,13 +13,13 @@ import { Order } from '../schemas/entities/order.entity';
 import { OrderItem } from '../schemas/entities/order-item.entity';
 import { Payment } from '../schemas/entities/payment.entity';
 import { RoleEnum } from '../../common/enums/role.enum';
+import { FlashSale } from '../schemas/entities/flash-sale.entity';
+import { FlashSaleItem } from '../schemas/entities/flash-sale-item.entity';
+import { ColorSize } from '../schemas/entities/color-size.entity';
 
-
-// Hàm đọc biến môi trường
 const get = (key: string, defaultValue?: string) =>
   process.env[key] ?? defaultValue ?? '';
 
-// Fake tên và địa chỉ Việt Nam
 function randomVietnameseName() {
   const lastNames = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Phan', 'Vũ', 'Đặng'];
   const middleNames = ['Văn', 'Thị', 'Hữu', 'Minh', 'Quang', 'Thành'];
@@ -45,13 +45,14 @@ const AppDataSource = new DataSource({
   host: get('DB_HOST', 'localhost'),
   port: Number(get('DB_PORT') ?? 3306),
   username: get('DB_USERNAME', 'root'),
-  password: get('DB_PASSWORD', '123456'),
+  password: get('DB_PASSWORD', ''),
   database: get('DB_DATABASE', 'ecommerce'),
   entities: [
     User,
     Role,
     Color,
     Size,
+     ColorSize,
     Category,
     Product,
     ProductVariant,
@@ -60,6 +61,9 @@ const AppDataSource = new DataSource({
     Order,
     OrderItem,
     Payment,
+     FlashSale,
+     FlashSaleItem,
+
 
   ],
   synchronize: true,
@@ -97,7 +101,7 @@ const colorRepo = AppDataSource.getRepository(Color);
   const colors = await colorRepo.save(colorsData.map(c => colorRepo.create(c)));
 
   // Sizes
-  const sizes = await sizeRepo.save(['S', 'M', 'L', 'XL'].map(name => sizeRepo.create({ name })));
+  const sizes = await sizeRepo.save(['S', 'M', 'L', 'XL', 'XXL', 'XXXL'].map(name => sizeRepo.create({ name })));
 
   // Users
   const users: User[] = [];
@@ -228,6 +232,42 @@ for (let i = 0; i < count; i++) {
       paymentTime: new Date(),
     });
     await paymentRepo.save(payment);
+    // FlashSales
+const flashSales: FlashSale[] = [];
+for (let i = 0; i < 5; i++) {
+  const product = faker.helpers.arrayElement(products);
+  const flashSale = AppDataSource.getRepository(FlashSale).create({
+    title: `Flash Sale ${i + 1}`,
+    startTime: faker.date.soon({ days: 2 }),
+    endTime: faker.date.soon({ days: 5 }),
+    isActive: true,
+    productId: product.id,
+  });
+  const savedFlashSale = await AppDataSource.getRepository(FlashSale).save(flashSale);
+  flashSales.push(savedFlashSale);
+
+  // Lấy các variant của product
+  const variants = await variantRepo.find({ where: { product: { id: product.id } } });
+
+  for (const variant of variants) {
+    const originalPrice = variant.priceOverride ?? product.price;
+    const discountPercentValue = faker.number.int({ min: 10, max: 50 }); // ví dụ 10-50%
+    const salePrice = Number((originalPrice * (1 - discountPercentValue / 100)).toFixed(2));
+
+    const flashSaleItem = AppDataSource.getRepository(FlashSaleItem).create({
+      flashSaleId: savedFlashSale.id,
+      productId: product.id,
+      productVariantId: variant.id,
+      salePrice,
+      discountPercent: discountPercentValue,
+      quantity: faker.number.int({ min: 1, max: 20 }),
+      note: 'Flash Sale',
+    });
+
+    await AppDataSource.getRepository(FlashSaleItem).save(flashSaleItem);
+  }
+}
+
   }
 
   console.log('🎉 Seed hoàn tất!');

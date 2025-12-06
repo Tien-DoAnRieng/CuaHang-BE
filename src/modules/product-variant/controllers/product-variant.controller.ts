@@ -11,14 +11,22 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
 import { RoleEnum } from '../../../common/enums/role.enum';
-
+import { Product } from '../../../shared/schemas/entities/product.entity';
+import { Category } from '../../../shared/schemas/entities/category.entity';
+import { FlashSaleItem } from '../../../shared/schemas/entities/flash-sale-item.entity';
+import { ProductService } from '../../product/services/product.service';
 @ApiTags('ProductVariant')
 @ApiBearerAuth('access-token')
 @Controller('product-variants')
 export class ProductVariantController {
   constructor(
+
+    private readonly productService: ProductService,
     @InjectRepository(ProductVariant)
-    private readonly variantRepository: Repository<ProductVariant>,
+      @InjectRepository(Product) private productRepository: Repository<Product>,
+    @InjectRepository(ProductVariant) private variantRepository: Repository<ProductVariant>,
+    @InjectRepository(Category) private categoryRepository: Repository<Category>,
+    @InjectRepository(FlashSaleItem) private flashSaleItemRepository: Repository<FlashSaleItem>,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -70,4 +78,16 @@ export class ProductVariantController {
   async remove(@Param('id') id: string) {
     return this.variantRepository.delete(id);
   }
+  // ProductController
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Get('product/:id/stock')
+  @ApiOperation({ summary: 'Lấy tổng tồn kho hiện tại của sản phẩm' })
+  @ApiResponse({ status: 200, description: 'Tồn kho sản phẩm.' })
+  async getStock(@Param('id') id: string) {
+    const stock = await this.productService.getStock(id);
+    return { productId: id, stock };
+  }
+
 }

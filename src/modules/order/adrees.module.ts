@@ -13,7 +13,6 @@ import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
 
 @Module({
-  // Register OrderItem, Payment, User, ProductVariant and Product repositories so OrderService can inject them
   imports: [TypeOrmModule.forFeature([Address, Order, OrderItem, Payment, User, ProductVariant, Product])],
   controllers: [AddressController, OrderController],
   providers: [AddressService, OrderService],

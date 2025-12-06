@@ -1,7 +1,5 @@
 import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-
-/** DTO dùng cho việc TẠO danh mục mới */
 export class CreateCategoryDto {
   @IsNotEmpty({ message: 'Tên danh mục không được để trống.' })
   @IsString({ message: 'Tên danh mục phải là chuỗi.' })
@@ -19,8 +17,6 @@ export class CreateCategoryDto {
   @ApiProperty({ example: null, required: false, description: 'ID danh mục mẹ nếu có' })
   parentId?: string;
 }
-
-/** DTO dùng cho việc CẬP NHẬT danh mục */
 export class UpdateCategoryDto {
   @IsOptional()
   @IsString({ message: 'Tên danh mục phải là chuỗi.' })

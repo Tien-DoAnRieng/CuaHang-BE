@@ -19,7 +19,6 @@ export class AddressController {
     @ApiBody({ type: CreateAddressDto })
     @ApiResponse({ status: 201, description: 'Address created', type: Address })
     async create(@Body() createAddressDto: CreateAddressDto, @Req() req: Request) {
-        // ensure the address is created for the authenticated user
         (createAddressDto as any).userId = (req as any).user.id;
         return this.addressService.create(createAddressDto);
     }
@@ -54,7 +53,7 @@ export class AddressController {
         if (address.userId !== userId) throw new ForbiddenException('Access denied');
         return this.addressService.update(id, updateAddressDto);
     }
-
+  
     @Delete(':id')
     @ApiOperation({ summary: 'Delete address' })
     @ApiResponse({ status: 204, description: 'Address deleted' })

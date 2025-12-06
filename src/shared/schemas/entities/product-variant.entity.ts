@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToMany, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { Product } from './product.entity';
 import { Color } from './color.entity';
@@ -15,7 +15,7 @@ export class ProductVariant extends BaseEntity {
   @Column({ name: 'size_id' })
   sizeId: string;
 
-  @Column({ name: 'stock_quantity' })
+  @Column({ name: 'stock_quantity', type: 'int', default: 0 })
   stockQuantity: number;
 
 
@@ -26,13 +26,12 @@ export class ProductVariant extends BaseEntity {
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'product_id' })
   product: Product;
+@ManyToOne(() => Color)
+@JoinColumn({ name: 'color_id' })
+color: Color;
 
-  @ManyToOne(() => Color)
-  @JoinColumn({ name: 'color_id' })
-  color: Color;
-
-  @ManyToOne(() => Size)
-  @JoinColumn({ name: 'size_id' })
-  size: Size;
+@ManyToOne(() => Size)
+@JoinColumn({ name: 'size_id' })
+size: Size;
 
 }

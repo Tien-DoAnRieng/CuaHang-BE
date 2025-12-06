@@ -6,36 +6,34 @@ import {
   Param,
   Body,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { BannerService } from './banner.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
-import { 
+import {
   ApiTags,
   ApiOperation,
   ApiParam,
-  ApiResponse,
-  ApiBody
+  ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
-
 @ApiTags('Banners')
 @Controller('banners')
 export class BannerController {
   constructor(private readonly bannerService: BannerService) {}
 
-  // CREATE
   @Post()
   @ApiOperation({
     summary: 'Tạo banner mới',
-    description: 'Tạo mới một banner với thông tin đầy đủ.',
+    description: 'Tạo một banner mới với thông tin đầy đủ.',
   })
   @ApiBody({
-    description: 'Dữ liệu tạo banner mới',
     schema: {
       example: {
         title: 'Khuyến mãi 50%',
-        description: 'Giảm giá tất cả sản phẩm trong tuần lễ vàng',
-        imageUrl: 'https://example.com/banner1.jpg',
+        description: 'Giảm giá tất cả sản phẩm tuần lễ vàng',
+        imageUrl: 'https://example.com/banner.jpg',
         active: true,
         priority: 10,
       },
@@ -44,26 +42,38 @@ export class BannerController {
   create(@Body() dto: CreateBannerDto) {
     return this.bannerService.create(dto);
   }
-
-  // FIND ALL
+  @Get('active')
+  @ApiOperation({ summary: 'Lấy danh sách banner đang bật' })
+  findActive() {
+    return this.bannerService.findActiveBanners();
+  }
   @Get()
   @ApiOperation({
-    summary: 'Lấy danh sách banner đang active',
-    description: 'Chỉ trả về banner active=true',
+    summary: 'Lấy danh sách banner với tìm kiếm, phân trang, lọc active',
   })
-  findAll() {
-    return this.bannerService.findAll();
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'active', required: false, description: 'true/false' })
+  findAll(
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('active') active?: string,
+  ) {
+    return this.bannerService.findAllWithPagination(
+      search,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      active === 'true' ? true : active === 'false' ? false : undefined,
+    );
   }
-
-  // FIND ONE
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin một banner' })
   @ApiParam({ name: 'id', description: 'ID banner' })
   findOne(@Param('id') id: string) {
     return this.bannerService.findOne(id);
   }
-
-  // UPDATE
   @Patch(':id')
   @ApiOperation({ summary: 'Cập nhật banner' })
   @ApiParam({ name: 'id', description: 'ID banner cần cập nhật' })
@@ -71,33 +81,32 @@ export class BannerController {
     description: 'Dữ liệu cập nhật banner',
     schema: {
       example: {
-        title: 'Cập nhật banner khuyến mãi',
-        description: 'Giảm giá lên đến 60%',
+        title: 'Banner cập nhật',
+        description: 'Giảm giá 60%',
         imageUrl: 'https://example.com/banner_update.jpg',
         active: true,
-        priority: 9,
+        priority: 8,
       },
     },
   })
   update(@Param('id') id: string, @Body() dto: UpdateBannerDto) {
     return this.bannerService.update(id, dto);
   }
-
-  // TOGGLE ACTIVE
-  @Patch(':id/toggle')
+  @Patch(':id/active')
   @ApiOperation({
-    summary: 'Bật / Tắt banner',
-    description: 'Tự động đổi active giữa true/false',
+    summary: 'Bật/tắt banner',
+    description: 'Cập nhật trạng thái active (true/false)',
   })
-  @ApiParam({ name: 'id', description: 'ID banner cần toggle' })
-  toggle(@Param('id') id: string) {
-    return this.bannerService.toggleActive(id);
+  @ApiParam({ name: 'id' })
+  @ApiBody({
+    schema: { example: { active: true } },
+  })
+  setActive(@Param('id') id: string, @Body('active') active: boolean) {
+    return this.bannerService.setActive(id, active);
   }
-
-  // DELETE
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa banner' })
-  @ApiParam({ name: 'id', description: 'ID banner cần xóa' })
+  @ApiParam({ name: 'id' })
   remove(@Param('id') id: string) {
     return this.bannerService.remove(id);
   }

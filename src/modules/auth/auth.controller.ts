@@ -13,6 +13,8 @@ import { RoleEnum } from '../../common/enums/role.enum';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { VerifyResetOtpDto } from './dto/verify-reset-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import type { Response } from 'express';
+import { Res } from '@nestjs/common';
 
 @ApiTags('Auth') // ✅ Nhóm endpoint trong Swagger
 @Controller('auth')
@@ -134,6 +136,15 @@ async resetPassword(@Body() dto: ResetPasswordDto) {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Google callback sau khi đăng nhập' })
+<<<<<<< HEAD
+  @ApiResponse({ status: 200, description: 'Đăng nhập Google thành công' })
+ async googleAuthRedirect(@Req() req, @Res() res: Response) {
+  const data = await this.authService.googleLogin(req);
+  const token = data.accessToken;
+
+  return res.redirect(`http://localhost:5173/login?token=${token}`);
+}
+=======
   @ApiResponse({ status: 302, description: 'Redirect về frontend với token' })
   async googleAuthRedirect(@Req() req, @Res() res: any) {
     // Sử dụng service để tạo / tìm user và sign JWT
@@ -155,5 +166,7 @@ async resetPassword(@Body() dto: ResetPasswordDto) {
 
     return res.redirect(redirectUrl);
   }
+>>>>>>> dev
+
 
 }

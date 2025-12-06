@@ -21,8 +21,6 @@ export class DashboardService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
   ) {}
-
-  // ===== Overview =====
   async getOverview(): Promise<OverviewDto> {
     const currentMonth = new Date().getMonth() + 1;
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -57,29 +55,6 @@ export class DashboardService {
       .getRawOne();
     return Number(result?.total || 0);
   }
-
-  // ===== Monthly Revenue =====
-  async getMonthlyRevenue(): Promise<MonthlyRevenueDto[]> {
-    const year = new Date().getFullYear();
-    const result = await this.orderRepo
-      .createQueryBuilder('order')
-      .select('EXTRACT(MONTH FROM order.createdAt)', 'month')
-      .addSelect('SUM(order.totalAmount)', 'actual')
-      .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
-      .groupBy('month')
-      .orderBy('month', 'ASC')
-      .getRawMany();
-
-    const data: MonthlyRevenueDto[] = [];
-    for (let i = 1; i <= 12; i++) {
-      const found = result.find((r) => Number(r.month) === i);
-      const actual = found ? Number(found.actual) : 0;
-      data.push({ month: i, actual, target: 140_000_000 / 12 });
-    }
-    return data;
-  }
-
-  // ===== Category Revenue =====
   async getRevenueByCategory(): Promise<CategoryRevenueDto[]> {
     const result = await this.orderItemRepo
       .createQueryBuilder('item')
@@ -98,8 +73,6 @@ export class DashboardService {
       percentage: total ? (Number(r.amount) / total) * 100 : 0,
     }));
   }
-
-  // ===== Customer Stats =====
   async getCustomerStats(): Promise<CustomerStatsDto[]> {
     const year = new Date().getFullYear();
     const result = await this.userRepo
@@ -124,8 +97,6 @@ export class DashboardService {
     }
     return data;
   }
-
-  // ===== Weekly Growth =====
   async getWeeklyGrowth(): Promise<WeeklyGrowthDto[]> {
     const now = new Date();
     const past = new Date();
@@ -150,8 +121,6 @@ export class DashboardService {
       };
     });
   }
-
-  // ===== Recent Orders =====
   async getRecentOrders() {
     return this.orderRepo
       .createQueryBuilder('order')
@@ -160,8 +129,6 @@ export class DashboardService {
       .limit(5)
       .getMany();
   }
-
-// ===== Export Revenue Excel =====
 async exportRevenueExcel(
   type: 'month' | 'year' | 'week',
   months?: number[],
@@ -203,13 +170,9 @@ async exportRevenueExcel(
       }
     });
   }
-
-  // Chuyển ArrayBuffer sang Node Buffer
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }
-
-// ===== Export Orders Excel =====
 async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Orders');
@@ -251,6 +214,66 @@ async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<B
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
+}
+async getDailyRevenue(year: number, month: number): Promise<MonthlyRevenueDto[]> {
+  const result = await this.orderRepo
+    .createQueryBuilder('order')
+    .select('EXTRACT(DAY FROM order.createdAt)', 'day')
+    .addSelect('SUM(order.totalAmount)', 'total')
+    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+    .andWhere('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+    .groupBy('day')
+    .orderBy('day', 'ASC')
+    .getRawMany();
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const data: MonthlyRevenueDto[] = [];
+  for (let i = 1; i <= daysInMonth; i++) {
+    const found = result.find((r) => Number(r.day) === i);
+    const actual = found ? Number(found.total) : 0;
+    data.push({ month: i, actual, target: 0 }); // target có thể tuỳ chỉnh
+  }
+  return data;
+}
+async getYearlyRevenue(): Promise<MonthlyRevenueDto[]> {
+  const currentYear = new Date().getFullYear();
+  const startYear = currentYear - 4; // ví dụ 5 năm gần đây
+
+  const result = await this.orderRepo
+    .createQueryBuilder('order')
+    .select('EXTRACT(YEAR FROM order.createdAt)', 'year')
+    .addSelect('SUM(order.totalAmount)', 'total')
+    .where('EXTRACT(YEAR FROM order.createdAt) >= :startYear', { startYear })
+    .groupBy('year')
+    .orderBy('year', 'ASC')
+    .getRawMany();
+
+  const data: MonthlyRevenueDto[] = [];
+  for (let y = startYear; y <= currentYear; y++) {
+    const found = result.find((r) => Number(r.year) === y);
+    const actual = found ? Number(found.total) : 0;
+    data.push({ month: y, actual, target: 0 });
+  }
+  return data;
+}
+async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
+  const y = year || new Date().getFullYear();
+  const result = await this.orderRepo
+    .createQueryBuilder('order')
+    .select('EXTRACT(MONTH FROM order.createdAt)', 'month')
+    .addSelect('SUM(order.totalAmount)', 'actual')
+    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year: y })
+    .groupBy('month')
+    .orderBy('month', 'ASC')
+    .getRawMany();
+
+  const data: MonthlyRevenueDto[] = [];
+  for (let i = 1; i <= 12; i++) {
+    const found = result.find((r) => Number(r.month) === i);
+    const actual = found ? Number(found.actual) : 0;
+    data.push({ month: i, actual, target: 140_000_000 / 12 });
+  }
+  return data;
 }
 
 }

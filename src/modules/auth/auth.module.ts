@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
@@ -15,21 +16,23 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { QueueModule } from '../queue/queue.module';
 import { UserOtpLog } from '../../shared/schemas/entities/user-otp-log.entity';
 import { GoogleStrategy } from '../../common/strategies/google.strategy';
+import { redisStore } from 'cache-manager-ioredis-yet';
+
 @Module({
   imports: [
-    PassportModule.register({ defaultStrategy: 'google' }),
     ConfigModule.forRoot({ isGlobal: true }),
+
     TypeOrmModule.forFeature([User, Role, UserOtpLog]),
+
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret:  configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_SECRET'),
         signOptions: { expiresIn: '1h' },
       }),
     }),
-    PassportModule,
     MailerModule.forRoot({
       transport: {
         host: 'smtp.gmail.com',
@@ -43,19 +46,33 @@ import { GoogleStrategy } from '../../common/strategies/google.strategy';
       defaults: {
         from: '"No Reply" <noreply@nestjs.com>',
       },
-template: {
-  dir: join(process.cwd(), 'src/modules/auth/templates'),
-  adapter: new HandlebarsAdapter(),
-  options: {
-    strict: true,
-  },
-},
-
+      template: {
+        dir: join(process.cwd(), 'src/modules/auth/templates'),
+        adapter: new HandlebarsAdapter(),
+        options: {
+          strict: true,
+        },
+      },
+    }),
+    CacheModule.registerAsync({
+      isGlobal: false,
+      useFactory: async () => ({
+        store: await redisStore({
+          host: process.env.REDIS_HOST || '127.0.0.1',
+          port: Number(process.env.REDIS_PORT) || 6379,      
+        }),
+      }),
     }),
     UserModule,
     QueueModule,
   ],
+
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy,GoogleStrategy],
+
+  providers: [
+    AuthService,
+    JwtStrategy,
+    GoogleStrategy,
+  ],
 })
 export class AuthModule {}

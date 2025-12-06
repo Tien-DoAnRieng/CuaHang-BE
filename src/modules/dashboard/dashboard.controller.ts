@@ -25,12 +25,6 @@ export class DashboardController {
     return this.dashboardService.getOverview();
   }
 
-@Get('monthly-revenue')
-@ApiOperation({ summary: 'Doanh thu theo tháng' })
-@ApiResponse({ status: 200, type: [MonthlyRevenueDto] })
-async getMonthlyRevenue(): Promise<MonthlyRevenueDto[]> {
-  return this.dashboardService.getMonthlyRevenue();
-}
 
 
   @Get('category-revenue')
@@ -60,7 +54,6 @@ async getMonthlyRevenue(): Promise<MonthlyRevenueDto[]> {
     return this.dashboardService.getRecentOrders();
   }
 
-  // Helper: parse query param number / number[]
   private parseQueryNumbers(query?: string | string[]): number[] | undefined {
     if (!query) return undefined;
     if (Array.isArray(query)) return query.map(Number);
@@ -109,4 +102,24 @@ async getMonthlyRevenue(): Promise<MonthlyRevenueDto[]> {
     });
     res.send(buffer);
   }
+@Get('daily-revenue')
+async getDailyRevenue(@Query('year') year?: string, @Query('month') month?: string) {
+  const y = year ? Number(year) : new Date().getFullYear();
+  const m = month ? Number(month) : new Date().getMonth() + 1;
+  return this.dashboardService.getDailyRevenue(y, m);
+}
+
+@Get('yearly-revenue')
+async getYearlyRevenue() {
+  return this.dashboardService.getYearlyRevenue();
+}
+
+@Get('monthly-revenue')
+@ApiOperation({ summary: 'Doanh thu theo tháng (có thể filter theo năm)' })
+@ApiQuery({ name: 'year', required: false })
+async getMonthlyRevenueFiltered(@Query('year') year?: string) {
+  const y = year ? Number(year) : undefined;
+  return this.dashboardService.getMonthlyRevenue(y);
+}
+
 }
