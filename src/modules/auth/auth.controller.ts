@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, UseGuards, Param, Request, Get, Req, UseInterceptors } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Param, Request, Get, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiParam, ApiBearerAuth} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -131,10 +131,12 @@ async resetPassword(@Body() dto: ResetPasswordDto) {
   @ApiOperation({ summary: 'Chuyển hướng đến Google để đăng nhập' })
   @ApiResponse({ status: 302, description: 'Redirect đến Google' })
   async googleAuth() {}
-
+   
+  
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiOperation({ summary: 'Google callback sau khi đăng nhập' })
+<<<<<<< HEAD
   @ApiResponse({ status: 200, description: 'Đăng nhập Google thành công' })
  async googleAuthRedirect(@Req() req, @Res() res: Response) {
   const data = await this.authService.googleLogin(req);
@@ -142,6 +144,29 @@ async resetPassword(@Body() dto: ResetPasswordDto) {
 
   return res.redirect(`http://localhost:5173/login?token=${token}`);
 }
+=======
+  @ApiResponse({ status: 302, description: 'Redirect về frontend với token' })
+  async googleAuthRedirect(@Req() req, @Res() res: any) {
+    // Sử dụng service để tạo / tìm user và sign JWT
+    const result = await this.authService.googleLogin(req);
+
+    const FRONTEND = process.env.FRONTEND_URL || process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+
+    // Nếu không có token → redirect về trang login với lỗi
+    const token = result?.accessToken || result?.access_token;
+    if (!token) {
+      const failedUrl = `${FRONTEND.replace(/\/$/, '')}/login?error=google_failed`;
+      return res.redirect(failedUrl);
+    }
+
+    // Redirect về frontend callback để frontend lưu token và lấy profile
+    const redirectUrl = `${FRONTEND.replace(/\/$/, '')}/auth/callback?access_token=${encodeURIComponent(
+      token,
+    )}`;
+
+    return res.redirect(redirectUrl);
+  }
+>>>>>>> dev
 
 
 }

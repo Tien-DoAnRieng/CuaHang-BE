@@ -71,12 +71,12 @@ export class UserService {
   /** User cập nhật profile (tên + đổi mật khẩu) */
   async updateProfile(
     userId: string,
-    dto: { name?: string; currentPassword?: string; newPassword?: string; confirmNewPassword?: string },
+    dto: { name?: string; currentPassword?: string; newPassword?: string; confirmNewPassword?: string; phone?: string; gender?: 'MALE' | 'FEMALE' | 'OTHER'; dateOfBirth?: string },
   ): Promise<any> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    const { name, currentPassword, newPassword, confirmNewPassword } = dto;
+    const { name, currentPassword, newPassword, confirmNewPassword, phone, gender, dateOfBirth } = dto;
 
     if (newPassword) {
       // require currentPassword
@@ -94,6 +94,44 @@ export class UserService {
     }
 
     if (name) user.name = name;
+
+    if (phone !== undefined) {
+      user.phone = phone || null;
+    }
+
+    if (gender !== undefined) {
+      const allowed = ['MALE', 'FEMALE', 'OTHER'];
+      if (gender && !allowed.includes(gender)) throw new BadRequestException('gender must be one of MALE, FEMALE, OTHER');
+      user.gender = gender || null;
+    }
+
+    if (dateOfBirth !== undefined) {
+      if (dateOfBirth === '' || dateOfBirth === null) {
+        user.dateOfBirth = null;
+      } else {
+        // Accept either ISO YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
+        let d: Date | null = null;
+        const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+        const dmyRe = /^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/;
+        if (isoRe.test(dateOfBirth)) {
+          d = new Date(dateOfBirth);
+        } else if (dmyRe.test(dateOfBirth)) {
+          const sep = dateOfBirth.includes('/') ? '/' : '-';
+          const parts = dateOfBirth.split(sep);
+          // parts: [DD, MM, YYYY]
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          d = new Date(year, month, day);
+        } else {
+          // fallback: attempt Date parsing
+          d = new Date(dateOfBirth);
+        }
+
+        if (!d || isNaN(d.getTime())) throw new BadRequestException('dateOfBirth must be a valid date (YYYY-MM-DD or DD/MM/YYYY)');
+        user.dateOfBirth = d;
+      }
+    }
 
     return this.usersRepository.save(user);
   }

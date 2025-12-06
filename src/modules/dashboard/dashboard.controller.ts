@@ -54,7 +54,6 @@ export class DashboardController {
     return this.dashboardService.getRecentOrders();
   }
 
-  // Helper: parse query param number / number[]
   private parseQueryNumbers(query?: string | string[]): number[] | undefined {
     if (!query) return undefined;
     if (Array.isArray(query)) return query.map(Number);
@@ -115,7 +114,6 @@ async getYearlyRevenue() {
   return this.dashboardService.getYearlyRevenue();
 }
 
-// Cập nhật monthly-revenue để lọc theo năm
 @Get('monthly-revenue')
 @ApiOperation({ summary: 'Doanh thu theo tháng (có thể filter theo năm)' })
 @ApiQuery({ name: 'year', required: false })

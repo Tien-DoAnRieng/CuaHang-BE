@@ -1,11 +1,13 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateAddressDto {
-  @IsNotEmpty()
+  // userId is attached on the server from the authenticated request;
+  // make it optional for client payload validation
+  @IsOptional()
   @IsString()
-  @ApiProperty({ example: 'uuid-user' })
-  userId: string;
+  @ApiProperty({ example: 'uuid-user', required: false })
+  userId?: string;
 
   @IsNotEmpty()
   @IsString()

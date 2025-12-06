@@ -2,6 +2,8 @@ import { Controller, Get, Post, Put, Delete, Query, Param, Body, UseGuards, Uplo
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiParam, ApiQuery, ApiConsumes, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import { ProductImportService } from '../services/product-import.service';
+import { ProductAnalyticsService } from '../services/product-analytics.service';
+import { Product } from '../../../shared/schemas/entities/product.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -22,6 +24,8 @@ export class ProductController {
     private readonly productImportService: ProductImportService,
        @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
+    private readonly productAnalyticsService: ProductAnalyticsService,
+
   ) {}
 
   // 🔹 Public API
@@ -86,8 +90,39 @@ export class ProductController {
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
   @ApiOperation({ summary: 'Import sản phẩm từ Excel (XLSX/CSV)' })
   async import(@UploadedFile() file: Express.Multer.File) {
+<<<<<<< HEAD
     if (!file || !file.buffer) return { error: 'No file uploaded' };
     return this.productImportService.importFromFile(file);
+=======
+    if (!file || !file.buffer) {
+      return { error: 'No file uploaded' };
+    }
+    const result = await this.productImportService.importFromFile(file);
+    return result;
+  }
+
+  @Public()
+  @Get('top-selling')
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Last N days to consider' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm bán chạy (top-selling)' })
+  async topSelling(@Query('limit') limit?: number, @Query('days') days?: number, @Query('categoryId') categoryId?: string) {
+    const l = limit ? Number(limit) : 10;
+    const d = days ? Number(days) : undefined;
+    return this.productAnalyticsService.getTopSelling({ limit: l, days: d, categoryId });
+  }
+
+  @Get()
+  @ApiQuery({ name: 'q', required: false, description: 'Từ khóa tìm kiếm (tên, mô tả)' })
+  @ApiQuery({ name: 'page', required: false, description: 'Số trang (pagination)', type: Number })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số item trên trang (pagination)', type: Number })
+  @ApiQuery({ name: 'category', required: false, description: 'Lọc theo tên category' })
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm' })
+  @ApiResponse({ status: 200, description: 'Danh sách sản phẩm.' })
+  findAll(@Query() query: any) {
+    return this.productService.findAll(query);
+>>>>>>> dev
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -102,5 +137,53 @@ export class ProductController {
   findAllAdmin(@Query() query: any) {
     return this.productService.findAll(query);
   }
+<<<<<<< HEAD
   
+=======
+
+  @Public()
+  @Get(':id')
+  @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
+  @ApiResponse({ status: 200, description: 'Chi tiết sản phẩm.' })
+  @ApiParam({ name: 'id', required: true })
+  findOne(@Param('id') id: string) {
+    return this.productService.findOne(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Put(':id')
+  @ApiOperation({ summary: 'Cập nhật sản phẩm(admin)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật sản phẩm thành công.' })
+  @ApiParam({ name: 'id', required: true })
+  @ApiBody({ type: Object })
+  update(@Param('id') id: string, @Body() data: Partial<Product>) {
+    return this.productService.update(id, data);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa sản phẩm(admin)' })
+  @ApiResponse({ status: 200, description: 'Xóa sản phẩm thành công.' })
+  remove(@Param('id') id: string) {
+    return this.productService.remove(id);
+  }
+  // Admin: top-selling with pagination & date range
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Get('admin/top-selling')
+  @ApiBearerAuth('access-token')
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'from', required: false, description: 'From date (ISO or DD/MM/YYYY)' })
+  @ApiQuery({ name: 'to', required: false, description: 'To date (ISO or DD/MM/YYYY)' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiOperation({ summary: 'Admin: Lấy top sản phẩm bán chạy (phân trang, date range)' })
+  async topSellingAdmin(@Query('page') page?: number, @Query('limit') limit?: number, @Query('from') from?: string, @Query('to') to?: string, @Query('categoryId') categoryId?: string) {
+    const p = page ? Number(page) : 1;
+    const l = limit ? Number(limit) : 20;
+    return this.productAnalyticsService.getTopSellingAdmin({ page: p, limit: l, from, to, categoryId });
+  }
+>>>>>>> dev
 }

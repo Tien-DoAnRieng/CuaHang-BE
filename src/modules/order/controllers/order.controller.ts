@@ -26,8 +26,6 @@ import { RoleEnum } from '../../../common/enums/role.enum';
 @Controller('orders')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
-
-  // User: Place order
   @UseGuards(JwtAuthGuard)
   @Post()
   @ApiOperation({ summary: 'User đặt hàng' })
@@ -36,11 +34,9 @@ export class OrderController {
   async placeOrder(@Req() req: any, @Body() dto: CreateOrderDto) {
     const userId = req.user?.id;
     if (!userId) throw new UnauthorizedException('User not authenticated');
-    // call service with authenticated user id (do not trust client-provided userId)
     return this.orderService.placeOrder(dto, userId);
   }
 
-  // User: Cancel order
   @UseGuards(JwtAuthGuard)
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'User huỷ đơn hàng' })
@@ -51,8 +47,6 @@ export class OrderController {
     const isAdmin = Array.isArray(roles) && roles.includes(RoleEnum.ADMIN);
     return this.orderService.cancelOrder(id, userId, isAdmin);
   }
-
-  // User: Lấy danh sách đơn hàng của chính họ
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiOperation({ summary: 'User: Lấy danh sách đơn hàng của chính mình' })
@@ -62,8 +56,6 @@ export class OrderController {
     const userId = req.user?.id;
     return this.orderService.findByUser(userId, { page: Number(page), limit: Number(limit) });
   }
-
-  // Admin: List orders with search & pagination
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get()
@@ -78,8 +70,6 @@ export class OrderController {
   ) {
     return this.orderService.findAll({ search, page, limit });
   }
-
-  // Admin: Get order by id
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get(':id')
@@ -89,8 +79,6 @@ export class OrderController {
   async findOne(@Param('id') id: string) {
     return this.orderService.findOne(id);
   }
-
-  // Admin: Update order status only
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Patch(':id/status')
@@ -100,8 +88,6 @@ export class OrderController {
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
     return this.orderService.updateStatus(id, dto.status);
   }
-
-  // Admin: Delete order
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Delete(':id')

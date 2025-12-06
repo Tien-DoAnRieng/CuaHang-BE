@@ -16,10 +16,9 @@ export class CategoryService {
     private categoryRepository: Repository<Category>,
 
     @InjectRepository(Product)
-    private productRepository: Repository<Product>, // Inject Product repository
+    private productRepository: Repository<Product>, 
   ) {}
 
-  /** Tạo danh mục mới (Admin) */
   async create(createCategoryDto: CreateCategoryDto): Promise<Category> {
     const existingCategory = await this.categoryRepository.findOne({
       where: { name: createCategoryDto.name },
@@ -30,19 +29,16 @@ export class CategoryService {
     return this.categoryRepository.save(newCategory);
   }
 
-  /** Lấy tất cả danh mục */
   async findAll(): Promise<Category[]> {
     return this.categoryRepository.find({ order: { name: 'ASC' } });
   }
 
-  /** Lấy chi tiết danh mục theo ID */
   async findOne(id: string): Promise<Category> {
     const category = await this.categoryRepository.findOne({ where: { id } });
     if (!category) throw new NotFoundException(`Không tìm thấy danh mục với ID ${id}.`);
     return category;
   }
 
-  /** Cập nhật danh mục (Admin) */
   async update(id: string, updateCategoryDto: UpdateCategoryDto): Promise<Category> {
     const category = await this.findOne(id);
 
@@ -57,23 +53,17 @@ export class CategoryService {
     Object.assign(category, updateCategoryDto);
     return this.categoryRepository.save(category);
   }
-
-  /** Xóa danh mục (Admin) */
   async remove(id: string): Promise<void> {
     const result = await this.categoryRepository.delete(id);
     if (result.affected === 0)
       throw new NotFoundException(`Không tìm thấy danh mục với ID ${id} để xóa.`);
   }
-
-  /** Lấy danh sách sản phẩm theo Category ID */
   async getProductsByCategory(categoryId: string) {
-    // Kiểm tra category có tồn tại không
     await this.findOne(categoryId);
 
-    // Trả về danh sách sản phẩm
     return this.productRepository.find({
       where: { category: { id: categoryId } },
-      order: { name: 'ASC' }, // có thể sắp xếp
+      order: { name: 'ASC' }, 
     });
   }
 }

@@ -28,6 +28,15 @@ passwordHash: string | null;
   @Column({ type: 'datetime', nullable: true })
   otpExpiresAt: Date | null;
 
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
+
+  @Column({ type: 'enum', enum: ['MALE', 'FEMALE', 'OTHER'], nullable: true })
+  gender: 'MALE' | 'FEMALE' | 'OTHER' | null;
+
+  @Column({ type: 'date', name: 'date_of_birth', nullable: true })
+  dateOfBirth: Date | null;
+
   constructor(partial?: Partial<User>) {
     super();
     Object.assign(this, partial);

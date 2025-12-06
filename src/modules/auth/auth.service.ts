@@ -26,7 +26,7 @@ import type { Cache } from 'cache-manager';
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly OTP_TTL = 600; // 10 phút
+  private readonly OTP_TTL = 600; 
 
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
@@ -40,7 +40,6 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
  async onApplicationBootstrap() {
-  // 1️⃣ Tạo role mặc định
   const roles = Object.values(RoleEnum) as string[];
   for (const roleName of roles) {
     const exist = await this.roleRepo.findOne({ where: { name: roleName } });
@@ -49,8 +48,6 @@ export class AuthService {
       this.logger.log(`✅ Default role "${roleName}" created.`);
     }
   }
-
-  // 2️⃣ Tạo admin mặc định từ .env
   const adminEmail = this.configService.get<string>('ADMIN_EMAIL');
   const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
 
@@ -77,10 +74,6 @@ export class AuthService {
     this.logger.log(`✅ Admin account "${adminEmail}" created from .env`);
   }
 }
-
-  // -------------------------------------------------------------------------
-  // REGISTER
-  // -------------------------------------------------------------------------
   async register(dto: RegisterUserDto) {
     const exist = await this.userRepo.findOne({ where: { email: dto.email } });
     if (exist) throw new BadRequestException('Email đã được sử dụng');
@@ -114,10 +107,6 @@ export class AuthService {
 
     return { message: 'Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.' };
   }
-
-  // -------------------------------------------------------------------------
-  // VERIFY EMAIL OTP
-  // -------------------------------------------------------------------------
   async verifyEmail(email: string, otp: string) {
     const user = await this.userRepo.findOne({ where: { email } });
     if (!user) throw new BadRequestException('Không tìm thấy tài khoản');
@@ -144,10 +133,6 @@ export class AuthService {
 
     return { message: 'Xác thực email thành công' };
   }
-
-  // -------------------------------------------------------------------------
-  // LOGIN
-  // -------------------------------------------------------------------------
   async login(dto: LoginDto) {
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
@@ -168,10 +153,6 @@ export class AuthService {
     const { passwordHash, ...cleanUser } = user;
     return { access_token: token, user: cleanUser };
   }
-
-  // -------------------------------------------------------------------------
-  // ADMIN UPDATE ROLE
-  // -------------------------------------------------------------------------
   async updateUserRole(adminId: string, userId: string, newRoleName: RoleEnum) {
     const admin = await this.userRepo.findOne({
       where: { id: adminId },
@@ -196,10 +177,6 @@ export class AuthService {
 
     return { message: `Đã đổi quyền của ${user.email} thành ${newRoleName}` };
   }
-
-  // -------------------------------------------------------------------------
-  // RESET PASSWORD OTP
-  // -------------------------------------------------------------------------
   async sendResetPasswordOtp(email: string) {
     const user = await this.userRepo.findOne({ where: { email } });
     if (!user) throw new BadRequestException('Không tìm thấy người dùng');
@@ -250,10 +227,6 @@ export class AuthService {
 
     return { message: 'Đặt lại mật khẩu thành công' };
   }
-
-  // -------------------------------------------------------------------------
-  // GOOGLE LOGIN
-  // -------------------------------------------------------------------------
   async googleLogin(req: any) {
     if (!req.user) return { message: 'Không có user từ Google' };
 
@@ -286,7 +259,11 @@ export class AuthService {
       email: user.email,
       role: user.role.name,
     });
-
-    return { message: 'Login Google thành công', user, accessToken: token };
+    return {
+      message: 'Google login success',
+      user,
+      accessToken: token,
+      access_token: token,
+    };
   }
 }

@@ -12,8 +12,6 @@ import { RoleEnum } from 'src/common/enums/role.enum';
 @Controller('categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
-
-  // 🔹 Public API
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách tất cả danh mục' })
   @ApiResponse({ status: 200, description: 'Danh sách danh mục.' })
@@ -35,8 +33,6 @@ export class CategoryController {
   async getProductsByCategory(@Param('id') id: string) {
     return this.categoryService.getProductsByCategory(id);
   }
-
-  // 🔹 Admin API
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)

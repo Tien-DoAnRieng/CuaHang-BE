@@ -24,12 +24,6 @@ export class ProductImportService {
     @InjectRepository(ProductImage) private imageRepo: Repository<ProductImage>,
     private productService: ProductService,
   ) {}
-
-  /**
-   * Parse an uploaded Excel/CSV buffer and import rows synchronously.
-   * Returns a summary with counts and per-row errors.
-   */
-  // Accept Multer file so we can detect originalname / mimetype and handle CSV encoding
   async importFromFile(file: Express.Multer.File) {
     const original = file.originalname || '';
     const lower = original.toLowerCase();
@@ -46,13 +40,10 @@ export class ProductImportService {
             csvString = iconv.decode(file.buffer, 'utf8');
             if (csvString && csvString.charCodeAt(0) === 0xfeff) csvString = csvString.slice(1);
           } else {
-            // iconv-lite accepts many aliases; pass through encoding name
             csvString = iconv.decode(file.buffer, enc as any);
           }
 
           if (!csvString) continue;
-
-          // Try to build a workbook from the decoded CSV string; accept this encoding only if parsing yields at least one sheet
           try {
             const wb = XLSX.read(csvString, { type: 'string' });
             if (wb && Array.isArray(wb.SheetNames) && wb.SheetNames.length > 0) {
@@ -61,18 +52,15 @@ export class ProductImportService {
               break;
             }
           } catch (innerErr) {
-            // parsing failed for this encoding, try next
             continue;
           }
         } catch (err) {
-          // try next encoding
           csvString = null;
           continue;
         }
       }
       if (!workbook) throw new Error('Unable to decode CSV file with supported encodings');
     } else {
-      // Assume xlsx or similar binary format
       workbook = XLSX.read(file.buffer, { type: 'buffer' });
     }
 
@@ -91,7 +79,7 @@ export class ProductImportService {
 
     for (let i = 0; i < raw.length; i++) {
       const row = raw[i];
-      const rowNum = i + 2; // header row assumed at 1
+      const rowNum = i + 2;
 
       try {
         const name = (row.name || row['Name'] || row['product_name'] || '').toString().trim();
@@ -105,8 +93,6 @@ export class ProductImportService {
         const brand = (row.brand || row['Brand'] || '').toString().trim() || 'Unknown';
         const categoryName = (row.category || row['Category'] || '').toString().trim();
         const status = (row.status || row['Status'] || 'ACTIVE').toString().trim();
-
-        // find or create category; if none provided create/find 'Uncategorized'
         let categoryId: string | undefined = undefined;
         if (categoryName) {
           let cat = await this.categoryRepo.findOne({ where: { name: categoryName } });
@@ -116,7 +102,6 @@ export class ProductImportService {
           }
           categoryId = cat.id;
         } else {
-          // ensure product has a category (product.category_id is non-nullable in schema)
           let defaultCat = await this.categoryRepo.findOne({ where: { name: 'Uncategorized' } });
           if (!defaultCat) {
             defaultCat = this.categoryRepo.create({ name: 'Uncategorized' });
@@ -124,8 +109,6 @@ export class ProductImportService {
           }
           categoryId = defaultCat.id;
         }
-
-        // attempt to find existing product by name+brand
         let product: Product | null = null;
         const existing = await this.productRepo.findOne({ where: { name, brand }, relations: ['category'] });
 
@@ -147,14 +130,13 @@ export class ProductImportService {
           product = await this.productService.create(payload as any);
           summary.created++;
         }
-        // --- Variant handling (use color+size composite) ---
+
         const variantColorName = (row.variant_color || row['variant_color'] || '').toString().trim();
         const variantSizeName = (row.variant_size || row['variant_size'] || '').toString().trim();
         const variantPriceRaw = (row.variant_price || row['variant_price'] || '').toString().trim();
         const variantStockRaw = (row.variant_stock || row['variant_stock'] || '').toString().trim();
 
         if ((variantColorName || variantSizeName) && product) {
-          // color
           let color: Color | null = null;
           if (variantColorName) {
             color = await this.colorRepo.findOne({ where: { name: variantColorName } });
@@ -164,7 +146,6 @@ export class ProductImportService {
             }
           }
 
-          // size
           let size: Size | null = null;
           if (variantSizeName) {
             size = await this.sizeRepo.findOne({ where: { name: variantSizeName } });

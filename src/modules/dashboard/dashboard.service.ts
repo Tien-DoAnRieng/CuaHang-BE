@@ -21,8 +21,6 @@ export class DashboardService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
   ) {}
-
-  // ===== Overview =====
   async getOverview(): Promise<OverviewDto> {
     const currentMonth = new Date().getMonth() + 1;
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
@@ -57,8 +55,6 @@ export class DashboardService {
       .getRawOne();
     return Number(result?.total || 0);
   }
-
-  // ===== Category Revenue =====
   async getRevenueByCategory(): Promise<CategoryRevenueDto[]> {
     const result = await this.orderItemRepo
       .createQueryBuilder('item')
@@ -77,8 +73,6 @@ export class DashboardService {
       percentage: total ? (Number(r.amount) / total) * 100 : 0,
     }));
   }
-
-  // ===== Customer Stats =====
   async getCustomerStats(): Promise<CustomerStatsDto[]> {
     const year = new Date().getFullYear();
     const result = await this.userRepo
@@ -103,8 +97,6 @@ export class DashboardService {
     }
     return data;
   }
-
-  // ===== Weekly Growth =====
   async getWeeklyGrowth(): Promise<WeeklyGrowthDto[]> {
     const now = new Date();
     const past = new Date();
@@ -129,8 +121,6 @@ export class DashboardService {
       };
     });
   }
-
-  // ===== Recent Orders =====
   async getRecentOrders() {
     return this.orderRepo
       .createQueryBuilder('order')
@@ -139,8 +129,6 @@ export class DashboardService {
       .limit(5)
       .getMany();
   }
-
-// ===== Export Revenue Excel =====
 async exportRevenueExcel(
   type: 'month' | 'year' | 'week',
   months?: number[],
@@ -182,13 +170,9 @@ async exportRevenueExcel(
       }
     });
   }
-
-  // Chuyển ArrayBuffer sang Node Buffer
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }
-
-// ===== Export Orders Excel =====
 async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Orders');
@@ -231,7 +215,6 @@ async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<B
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }
-// Doanh thu theo ngày trong tháng
 async getDailyRevenue(year: number, month: number): Promise<MonthlyRevenueDto[]> {
   const result = await this.orderRepo
     .createQueryBuilder('order')
@@ -252,8 +235,6 @@ async getDailyRevenue(year: number, month: number): Promise<MonthlyRevenueDto[]>
   }
   return data;
 }
-
-// Doanh thu theo năm
 async getYearlyRevenue(): Promise<MonthlyRevenueDto[]> {
   const currentYear = new Date().getFullYear();
   const startYear = currentYear - 4; // ví dụ 5 năm gần đây
@@ -275,8 +256,6 @@ async getYearlyRevenue(): Promise<MonthlyRevenueDto[]> {
   }
   return data;
 }
-
-// Cập nhật monthly-revenue theo năm
 async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
   const y = year || new Date().getFullYear();
   const result = await this.orderRepo

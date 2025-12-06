@@ -9,6 +9,7 @@ import { ProductVariant } from '../../shared/schemas/entities/product-variant.en
 import { ProductImage } from '../../shared/schemas/entities/product-image.entity';
 import { FlashSaleItem } from '../../shared/schemas/entities/flash-sale-item.entity';
 import { FlashSale } from '../../shared/schemas/entities/flash-sale.entity';
+import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
 
 import { ProductVariantModule } from '../product-variant/product-variant.module';
 import { ProductImageModule } from '../product-image/product-image.module';
@@ -20,6 +21,7 @@ import { SizeController } from './controllers/size.controller';
 
 import { ProductService } from './services/product.service';
 import { ProductImportService } from './services/product-import.service';
+import { ProductAnalyticsService } from './services/product-analytics.service';
 import { ColorService } from './services/color.service';
 import { SizeService } from './services/size.service';
 import { ProductVariantService } from '../product-variant/services/product-variant.service';
@@ -34,7 +36,8 @@ import { ProductVariantService } from '../product-variant/services/product-varia
       ProductVariant,
       ProductImage,
       FlashSale,
-      FlashSaleItem, // <- quan trọng để inject repository
+      FlashSaleItem,
+      OrderItem,
     ]),
     FlashSaleModule,
     ProductVariantModule,
@@ -48,14 +51,15 @@ import { ProductVariantService } from '../product-variant/services/product-varia
   providers: [
     ProductService,
     ProductImportService,
+    ProductAnalyticsService,
     ColorService,
     SizeService,
-    ProductVariantService
+    ProductVariantService,
   ],
   exports: [
     ProductService,
     TypeOrmModule,
-     ProductVariantService,
+    ProductVariantService,
   ],
 })
 export class ProductModule {}

@@ -25,10 +25,6 @@ import { redisStore } from 'cache-manager-ioredis-yet';
     TypeOrmModule.forFeature([User, Role, UserOtpLog]),
 
     PassportModule.register({ defaultStrategy: 'jwt' }),
-
-    // -----------------------------
-    // JWT
-    // -----------------------------
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -37,10 +33,6 @@ import { redisStore } from 'cache-manager-ioredis-yet';
         signOptions: { expiresIn: '1h' },
       }),
     }),
-
-    // -----------------------------
-    // Mailer
-    // -----------------------------
     MailerModule.forRoot({
       transport: {
         host: 'smtp.gmail.com',
@@ -62,10 +54,6 @@ import { redisStore } from 'cache-manager-ioredis-yet';
         },
       },
     }),
-
-    // -----------------------------
-    // REDIS CACHE MODULE (đúng chỗ)
-    // -----------------------------
     CacheModule.registerAsync({
       isGlobal: false,
       useFactory: async () => ({
@@ -75,8 +63,6 @@ import { redisStore } from 'cache-manager-ioredis-yet';
         }),
       }),
     }),
-
-    // -----------------------------
     UserModule,
     QueueModule,
   ],

@@ -8,14 +8,20 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
-
-  // Lấy giỏ hàng của người đang đăng nhập
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiOperation({ summary: 'Lấy giỏ hàng của user (me)' })
   getMyCart(@Req() req: any) {
     const userId = req.user?.id;
     return this.cartService.getUserCart(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('check-availability')
+  @ApiOperation({ summary: 'Kiểm tra tồn kho các sản phẩm trong giỏ (trước khi thanh toán)' })
+  checkAvailability(@Req() req: any) {
+    const userId = req.user?.id;
+    return this.cartService.checkAvailability(userId);
   }
 
   @UseGuards(JwtAuthGuard)

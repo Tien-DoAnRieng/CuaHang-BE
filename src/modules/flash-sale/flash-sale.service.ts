@@ -19,7 +19,6 @@ export class FlashSaleService {
     private productVariantRepo: Repository<ProductVariant>,
   ) {}
 
-  // CREATE Flash Sale
   async create(dto: CreateFlashSaleDto) {
     const flashSale = this.flashSaleRepo.create({
       title: dto.title,
@@ -33,7 +32,6 @@ export class FlashSaleService {
 
     const items = await Promise.all(
       dto.items.map(async item => {
-        // Lấy productId từ variant nếu không có
         const variant = await this.productVariantRepo.findOne({
           where: { id: item.productVariantId },
         });
@@ -58,8 +56,6 @@ export class FlashSaleService {
     await this.flashSaleItemRepo.save(items);
     return saved;
   }
-
-  // FIND ALL
   async findAll(page: number, limit: number) {
     return this.flashSaleRepo.find({
       relations: ['items'],
@@ -67,8 +63,6 @@ export class FlashSaleService {
       take: limit,
     });
   }
-
-  // FIND ONE
   async findOne(id: string) {
     const flashSale = await this.flashSaleRepo.findOne({
       where: { id },
@@ -77,8 +71,6 @@ export class FlashSaleService {
     if (!flashSale) throw new NotFoundException('FlashSale not found');
     return flashSale;
   }
-
-  // UPDATE
   async update(id: string, dto: CreateFlashSaleDto) {
     await this.flashSaleRepo.update(id, {
       title: dto.title,
@@ -119,7 +111,6 @@ export class FlashSaleService {
     return this.findOne(id);
   }
 
-  // DELETE
   async delete(id: string) {
     await this.flashSaleItemRepo.delete({ flashSale: { id } });
     return this.flashSaleRepo.delete(id);

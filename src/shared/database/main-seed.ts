@@ -17,11 +17,9 @@ import { FlashSale } from '../schemas/entities/flash-sale.entity';
 import { FlashSaleItem } from '../schemas/entities/flash-sale-item.entity';
 import { ColorSize } from '../schemas/entities/color-size.entity';
 
-// Hàm đọc biến môi trường
 const get = (key: string, defaultValue?: string) =>
   process.env[key] ?? defaultValue ?? '';
 
-// Fake tên và địa chỉ Việt Nam
 function randomVietnameseName() {
   const lastNames = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Phan', 'Vũ', 'Đặng'];
   const middleNames = ['Văn', 'Thị', 'Hữu', 'Minh', 'Quang', 'Thành'];
@@ -65,6 +63,8 @@ const AppDataSource = new DataSource({
     Payment,
      FlashSale,
      FlashSaleItem,
+
+
   ],
   synchronize: true,
   logging: false,
@@ -76,7 +76,7 @@ async function runSeed() {
 
   // Repositories
   const roleRepo = AppDataSource.getRepository(Role);
-  const colorRepo = AppDataSource.getRepository(Color);
+const colorRepo = AppDataSource.getRepository(Color);
   const sizeRepo = AppDataSource.getRepository(Size);
   const userRepo = AppDataSource.getRepository(User);
   const categoryRepo = AppDataSource.getRepository(Category);
@@ -162,7 +162,7 @@ async function runSeed() {
   const allVariants: ProductVariant[] = [];
   for (const product of products) {
     const count = faker.number.int({ min: 2, max: 3 });
-    for (let i = 0; i < count; i++) {
+for (let i = 0; i < count; i++) {
       const variant = variantRepo.create({
         product,
         color: faker.helpers.arrayElement(colors),
@@ -278,4 +278,3 @@ runSeed().catch(err => {
   console.error('❌ Lỗi khi seed:', err);
   process.exit(1);
 });
-

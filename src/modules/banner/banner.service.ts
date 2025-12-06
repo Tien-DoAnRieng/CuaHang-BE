@@ -11,14 +11,10 @@ export class BannerService {
     @InjectRepository(Banner)
     private bannerRepo: Repository<Banner>,
   ) {}
-
-  // CREATE
   async create(dto: CreateBannerDto) {
     const banner = this.bannerRepo.create(dto);
     return this.bannerRepo.save(banner);
   }
-
-  // FIND ALL ACTIVE
   async findAll() {
     return this.bannerRepo.find({
       where: { active: true },
@@ -50,29 +46,20 @@ async findAllWithPagination(
     lastPage: Math.ceil(total / limit),
   };
 }
-
-
-  // FIND ONE
   async findOne(id: string) {
     const banner = await this.bannerRepo.findOne({ where: { id } });
     if (!banner) throw new NotFoundException('Banner not found');
     return banner;
   }
-
-  // UPDATE
   async update(id: string, dto: UpdateBannerDto) {
     await this.findOne(id);
     await this.bannerRepo.update(id, dto);
     return this.findOne(id);
   }
-
-  // DELETE
   async remove(id: string) {
     await this.findOne(id);
     return this.bannerRepo.delete(id);
   }
-
-  // SET ACTIVE TRUE/FALSE
   async setActive(id: string, active: boolean) {
     const banner = await this.findOne(id);
     banner.active = active;

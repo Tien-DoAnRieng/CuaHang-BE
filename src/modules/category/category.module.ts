@@ -7,11 +7,10 @@ import { Product } from '../../shared/schemas/entities/product.entity';
 
 @Module({
   imports: [
-    // Đăng ký TypeORM Repository cho Entity Category
     TypeOrmModule.forFeature([Category,Product]),
   ],
   controllers: [CategoryController],
   providers: [CategoryService],
-  exports: [CategoryService], // Xuất CategoryService nếu các module khác (ví dụ: ProductModule) cần sử dụng nó
+  exports: [CategoryService], 
 })
 export class CategoryModule {}

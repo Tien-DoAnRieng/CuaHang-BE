@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength, Matches, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -23,4 +23,21 @@ export class UpdateProfileDto {
   @MinLength(6)
   @ApiPropertyOptional({ example: 'newStrongPassword123', description: 'Nhập lại mật khẩu mới để xác nhận' })
   confirmNewPassword?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[+0-9\s-]{7,20}$/, { message: 'Số điện thoại không hợp lệ' })
+  @ApiPropertyOptional({ example: '+84901234567', description: 'Số điện thoại (có thể có dấu +)' })
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['MALE', 'FEMALE', 'OTHER'])
+  @ApiPropertyOptional({ example: 'MALE', enum: ['MALE', 'FEMALE', 'OTHER'], description: 'Giới tính' })
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+
+  @IsOptional()
+  @Matches(/^(?:\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2}[\/\-]\d{4})$/, { message: 'dateOfBirth must be YYYY-MM-DD or DD/MM/YYYY' })
+  @ApiPropertyOptional({ example: '20/05/1990', description: 'Ngày sinh (ISO YYYY-MM-DD hoặc DD/MM/YYYY)' })
+  dateOfBirth?: string;
 }
