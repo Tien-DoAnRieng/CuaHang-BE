@@ -41,6 +41,19 @@ export class ProductController {
     return this.productService.findAll(query);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Get('admin')
+  @ApiQuery({ name: 'q', required: false })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOperation({ summary: 'Danh sách sản phẩm admin (có phân trang và lọc)' })
+  @ApiResponse({ status: 200 })
+  findAllAdmin(@Query() query: any) {
+    return this.productService.findAll(query);
+  }
+
   @Public()
   @Get(':id')
   @ApiParam({ name: 'id', required: true })
@@ -90,10 +103,7 @@ export class ProductController {
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
   @ApiOperation({ summary: 'Import sản phẩm từ Excel (XLSX/CSV)' })
   async import(@UploadedFile() file: Express.Multer.File) {
-<<<<<<< HEAD
-    if (!file || !file.buffer) return { error: 'No file uploaded' };
-    return this.productImportService.importFromFile(file);
-=======
+
     if (!file || !file.buffer) {
       return { error: 'No file uploaded' };
     }
@@ -113,63 +123,6 @@ export class ProductController {
     return this.productAnalyticsService.getTopSelling({ limit: l, days: d, categoryId });
   }
 
-  @Get()
-  @ApiQuery({ name: 'q', required: false, description: 'Từ khóa tìm kiếm (tên, mô tả)' })
-  @ApiQuery({ name: 'page', required: false, description: 'Số trang (pagination)', type: Number })
-  @ApiQuery({ name: 'limit', required: false, description: 'Số item trên trang (pagination)', type: Number })
-  @ApiQuery({ name: 'category', required: false, description: 'Lọc theo tên category' })
-  @ApiOperation({ summary: 'Lấy danh sách sản phẩm' })
-  @ApiResponse({ status: 200, description: 'Danh sách sản phẩm.' })
-  findAll(@Query() query: any) {
-    return this.productService.findAll(query);
->>>>>>> dev
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @Get('admin')
-  @ApiQuery({ name: 'q', required: false })
-  @ApiQuery({ name: 'category', required: false })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiOperation({ summary: 'Danh sách sản phẩm admin (có phân trang và lọc)' })
-  @ApiResponse({ status: 200 })
-  findAllAdmin(@Query() query: any) {
-    return this.productService.findAll(query);
-  }
-<<<<<<< HEAD
-  
-=======
-
-  @Public()
-  @Get(':id')
-  @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
-  @ApiResponse({ status: 200, description: 'Chi tiết sản phẩm.' })
-  @ApiParam({ name: 'id', required: true })
-  findOne(@Param('id') id: string) {
-    return this.productService.findOne(id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @Put(':id')
-  @ApiOperation({ summary: 'Cập nhật sản phẩm(admin)' })
-  @ApiResponse({ status: 200, description: 'Cập nhật sản phẩm thành công.' })
-  @ApiParam({ name: 'id', required: true })
-  @ApiBody({ type: Object })
-  update(@Param('id') id: string, @Body() data: Partial<Product>) {
-    return this.productService.update(id, data);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @Delete(':id')
-  @ApiOperation({ summary: 'Xóa sản phẩm(admin)' })
-  @ApiResponse({ status: 200, description: 'Xóa sản phẩm thành công.' })
-  remove(@Param('id') id: string) {
-    return this.productService.remove(id);
-  }
-  // Admin: top-selling with pagination & date range
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get('admin/top-selling')
@@ -185,5 +138,5 @@ export class ProductController {
     const l = limit ? Number(limit) : 20;
     return this.productAnalyticsService.getTopSellingAdmin({ page: p, limit: l, from, to, categoryId });
   }
->>>>>>> dev
+
 }

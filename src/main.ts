@@ -10,9 +10,15 @@ async function bootstrap() {
   // ✅ Bật CORS (để Swagger và Frontend gọi API được).
   // Khi frontend gửi request kèm credentials, Access-Control-Allow-Origin
   // KHÔNG được là wildcard '*'. Đặt origin cụ thể hoặc đọc từ env.
-  const FRONTEND_ORIGIN = process.env.FRONTEND_URL || process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+  const allowedOrigins = [
+    'http://localhost:5173', // Frontend user
+    'http://localhost:5174', // Frontend admin
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_ORIGIN,
+  ].filter(Boolean); // Loại bỏ undefined
+
   app.enableCors({
-    origin: FRONTEND_ORIGIN,
+    origin: allowedOrigins,
     credentials: true,
   });
 
