@@ -11,9 +11,9 @@ export class CreateFlashSaleItemDto {
   @IsNumber()
   discountValue: number;
 
-
+  @IsOptional()
   @IsNumber()
-  originalPrice: number
+  originalPrice?: number; // Optional - sẽ tự động lấy từ variant nếu không có
 
   @IsOptional()
   @IsNumber()

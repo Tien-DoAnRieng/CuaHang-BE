@@ -30,7 +30,7 @@ import { redisStore } from 'cache-manager-ioredis-yet';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '30d' }, // Tăng lên 30 ngày
       }),
     }),
     MailerModule.forRoot({

@@ -4,7 +4,7 @@ import { ColorSizeService } from './color-size.service';
 import { AddSizesToColorDto } from './dto/create-multi-size.dto';
 
 @ApiTags('Color-Size')
-@Controller('colors')
+@Controller('colors-size')
 export class ColorSizeController {
   constructor(private readonly service: ColorSizeService) {}
 

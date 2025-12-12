@@ -4,6 +4,7 @@ import { User } from '../schemas/entities/user.entity';
 import { Role } from '../schemas/entities/role.entity';
 import { Color } from '../schemas/entities/color.entity';
 import { Size } from '../schemas/entities/size.entity';
+import { ColorSize } from '../schemas/entities/color-size.entity';
 import { Category } from '../schemas/entities/category.entity';
 import { Product } from '../schemas/entities/product.entity';
 import { ProductVariant } from '../schemas/entities/product-variant.entity';
@@ -12,10 +13,11 @@ import { Address } from '../schemas/entities/address.entity';
 import { Order } from '../schemas/entities/order.entity';
 import { OrderItem } from '../schemas/entities/order-item.entity';
 import { Payment } from '../schemas/entities/payment.entity';
-import { RoleEnum } from '../../common/enums/role.enum';
 import { FlashSale } from '../schemas/entities/flash-sale.entity';
 import { FlashSaleItem } from '../schemas/entities/flash-sale-item.entity';
-import { ColorSize } from '../schemas/entities/color-size.entity';
+import { RoleEnum } from '../../common/enums/role.enum';
+import { MemberType } from '../schemas/entities/member-type.entity';
+import { Brand } from '../schemas/entities/brand.entity';
 
 const get = (key: string, defaultValue?: string) =>
   process.env[key] ?? defaultValue ?? '';
@@ -45,26 +47,12 @@ const AppDataSource = new DataSource({
   host: get('DB_HOST', 'localhost'),
   port: Number(get('DB_PORT') ?? 3306),
   username: get('DB_USERNAME', 'root'),
-  password: get('DB_PASSWORD', ''),
+  password: get('DB_PASSWORD', '123456'),
   database: get('DB_DATABASE', 'ecommerce'),
   entities: [
-    User,
-    Role,
-    Color,
-    Size,
-     ColorSize,
-    Category,
-    Product,
-    ProductVariant,
-    ProductImage,
-    Address,
-    Order,
-    OrderItem,
-    Payment,
-     FlashSale,
-     FlashSaleItem,
-
-
+    User, Role, Color, Size, ColorSize, Category, Product, ProductVariant,
+    ProductImage, Address, Order, OrderItem, Payment, FlashSale, FlashSaleItem,
+    MemberType, Brand,
   ],
   synchronize: true,
   logging: false,
@@ -74,9 +62,8 @@ async function runSeed() {
   await AppDataSource.initialize();
   console.log('✅ Kết nối database thành công!');
 
-  // Repositories
   const roleRepo = AppDataSource.getRepository(Role);
-const colorRepo = AppDataSource.getRepository(Color);
+  const colorRepo = AppDataSource.getRepository(Color);
   const sizeRepo = AppDataSource.getRepository(Size);
   const userRepo = AppDataSource.getRepository(User);
   const categoryRepo = AppDataSource.getRepository(Category);
@@ -87,8 +74,10 @@ const colorRepo = AppDataSource.getRepository(Color);
   const orderRepo = AppDataSource.getRepository(Order);
   const orderItemRepo = AppDataSource.getRepository(OrderItem);
   const paymentRepo = AppDataSource.getRepository(Payment);
-
-  // Lấy role customer
+  const flashSaleRepo = AppDataSource.getRepository(FlashSale);
+  const flashSaleItemRepo = AppDataSource.getRepository(FlashSaleItem);
+const memberTypeRepo = AppDataSource.getRepository(MemberType);
+const brandRepo = AppDataSource.getRepository(Brand);
   const customerRole = await roleRepo.findOneBy({ name: RoleEnum.CUSTOMER });
   if (!customerRole) throw new Error(`Role '${RoleEnum.CUSTOMER}' chưa tồn tại trong DB!`);
 
@@ -144,7 +133,7 @@ const colorRepo = AppDataSource.getRepository(Color);
     categories.push(await categoryRepo.save(cat));
   }
 
-  // Products
+  // Products + Variants + hasVariants
   const products: Product[] = [];
   for (let i = 0; i < 20; i++) {
     const product = productRepo.create({
@@ -154,15 +143,29 @@ const colorRepo = AppDataSource.getRepository(Color);
       brand: faker.company.name(),
       category: faker.helpers.arrayElement(categories),
       status: 'ACTIVE',
+      hasVariants: false,
     });
-    products.push(await productRepo.save(product));
-  }
+    await productRepo.save(product);
 
-  // ProductVariants
-  const allVariants: ProductVariant[] = [];
-  for (const product of products) {
-    const count = faker.number.int({ min: 2, max: 3 });
-for (let i = 0; i < count; i++) {
+    // Quyết định có variant hay không
+    const createVariant = faker.datatype.boolean(); // 50% chance
+    let variants: ProductVariant[] = [];
+    if (createVariant) {
+      const count = faker.number.int({ min: 2, max: 3 });
+      for (let j = 0; j < count; j++) {
+        const variant = variantRepo.create({
+          product,
+          color: faker.helpers.arrayElement(colors),
+          size: faker.helpers.arrayElement(sizes),
+          stockQuantity: faker.number.int({ min: 5, max: 50 }),
+          priceOverride: product.price,
+        });
+        variants.push(await variantRepo.save(variant));
+      }
+      product.hasVariants = true;
+      await productRepo.save(product);
+    } else {
+      // Tạo 1 variant mặc định cho sản phẩm không có variant
       const variant = variantRepo.create({
         product,
         color: faker.helpers.arrayElement(colors),
@@ -170,21 +173,23 @@ for (let i = 0; i < count; i++) {
         stockQuantity: faker.number.int({ min: 5, max: 50 }),
         priceOverride: product.price,
       });
-      allVariants.push(await variantRepo.save(variant));
+      variants.push(await variantRepo.save(variant));
+      product.hasVariants = false;
+      await productRepo.save(product);
     }
-  }
 
-  // ProductImages
-  for (const product of products) {
-    const count = faker.number.int({ min: 1, max: 2 });
-    for (let i = 0; i < count; i++) {
+    // ProductImages
+    const countImages = faker.number.int({ min: 1, max: 2 });
+    for (let k = 0; k < countImages; k++) {
       const image = productImageRepo.create({
         product,
         imageUrl: faker.image.url({ width: 640, height: 480 }),
-        isMain: i === 0,
+        isMain: k === 0,
       });
       await productImageRepo.save(image);
     }
+
+    products.push(product);
   }
 
   // Orders + OrderItems + Payments
@@ -205,20 +210,20 @@ for (let i = 0; i < count; i++) {
     let total = 0;
 
     for (const product of orderProducts) {
-      const variants = await variantRepo.find({ where: { product: { id: product.id } }, relations: ['color', 'size'] });
+      const variants = await variantRepo.find({ where: { product: { id: product.id } } });
       const variant = faker.helpers.arrayElement(variants);
 
       const quantity = faker.number.int({ min: 1, max: 5 });
-      const itemTotal = variant.priceOverride * quantity;
+      const price = variant.priceOverride;
+      total += price * quantity;
 
       const orderItem = orderItemRepo.create({
         order: savedOrder,
         variant,
         quantity,
-        priceAtTime: variant.priceOverride,
+        priceAtTime: price,
       });
       await orderItemRepo.save(orderItem);
-      total += itemTotal;
     }
 
     savedOrder.totalAmount = total;
@@ -232,42 +237,35 @@ for (let i = 0; i < count; i++) {
       paymentTime: new Date(),
     });
     await paymentRepo.save(payment);
-    // FlashSales
-const flashSales: FlashSale[] = [];
-for (let i = 0; i < 5; i++) {
-  const product = faker.helpers.arrayElement(products);
-  const flashSale = AppDataSource.getRepository(FlashSale).create({
-    title: `Flash Sale ${i + 1}`,
-    startTime: faker.date.soon({ days: 2 }),
-    endTime: faker.date.soon({ days: 5 }),
-    isActive: true,
-    productId: product.id,
-  });
-  const savedFlashSale = await AppDataSource.getRepository(FlashSale).save(flashSale);
-  flashSales.push(savedFlashSale);
-
-  // Lấy các variant của product
-  const variants = await variantRepo.find({ where: { product: { id: product.id } } });
-
-  for (const variant of variants) {
-    const originalPrice = variant.priceOverride ?? product.price;
-    const discountPercentValue = faker.number.int({ min: 10, max: 50 }); // ví dụ 10-50%
-    const salePrice = Number((originalPrice * (1 - discountPercentValue / 100)).toFixed(2));
-
-    const flashSaleItem = AppDataSource.getRepository(FlashSaleItem).create({
-      flashSaleId: savedFlashSale.id,
-      productId: product.id,
-      productVariantId: variant.id,
-      salePrice,
-      discountPercent: discountPercentValue,
-      quantity: faker.number.int({ min: 1, max: 20 }),
-      note: 'Flash Sale',
-    });
-
-    await AppDataSource.getRepository(FlashSaleItem).save(flashSaleItem);
   }
-}
 
+  // FlashSales + FlashSaleItems
+  for (let i = 0; i < 5; i++) {
+    const product = faker.helpers.arrayElement(products);
+    const flashSale = flashSaleRepo.create({
+      title: `Flash Sale ${i + 1}`,
+      startTime: faker.date.soon({ days: 2 }),
+      endTime: faker.date.soon({ days: 5 }),
+      isActive: true,
+      productId: product.id,
+    });
+    const savedFlashSale = await flashSaleRepo.save(flashSale);
+
+    const variants = await variantRepo.find({ where: { product: { id: product.id } } });
+    for (const variant of variants) {
+      const discountPercent = faker.number.int({ min: 10, max: 50 });
+      const salePrice = Number(((variant.priceOverride ?? product.price) * (1 - discountPercent / 100)).toFixed(2));
+      const flashSaleItem = flashSaleItemRepo.create({
+        flashSale: savedFlashSale,
+        product,
+        productVariant: variant,
+        salePrice,
+        discountPercent,
+        quantity: faker.number.int({ min: 1, max: 20 }),
+        note: 'Flash Sale',
+      });
+      await flashSaleItemRepo.save(flashSaleItem);
+    }
   }
 
   console.log('🎉 Seed hoàn tất!');

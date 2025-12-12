@@ -34,17 +34,29 @@ export class FlashSaleService {
       dto.items.map(async item => {
         const variant = await this.productVariantRepo.findOne({
           where: { id: item.productVariantId },
+          relations: ['product'],
         });
         if (!variant) throw new NotFoundException('ProductVariant not found');
+
+        // Lấy giá gốc từ variant (priceOverride hoặc product.price)
+        const originalPrice = variant.priceOverride 
+          ? parseFloat(String(variant.priceOverride))
+          : parseFloat(String(variant.product?.price || 0));
+        
+        if (!originalPrice || originalPrice <= 0) {
+          throw new NotFoundException(`Product variant ${item.productVariantId} has no valid price`);
+        }
+
+        // Tính salePrice dựa trên discountType
+        const salePrice = item.discountType === 'PERCENT'
+          ? originalPrice * (1 - item.discountValue / 100)
+          : originalPrice - item.discountValue;
 
         return this.flashSaleItemRepo.create({
           flashSale: { id: saved.id },
           productVariant: { id: item.productVariantId },
           productId: variant.productId,
-          salePrice:
-            item.discountType === 'PERCENT'
-              ? item.originalPrice * (1 - item.discountValue / 100)
-              : item.originalPrice - item.discountValue,
+          salePrice: Math.max(0, salePrice), // Đảm bảo salePrice không âm
           discountPercent:
             item.discountType === 'PERCENT' ? item.discountValue : undefined,
           quantity: item.quantity ?? 0,
@@ -87,17 +99,29 @@ export class FlashSaleService {
       dto.items.map(async item => {
         const variant = await this.productVariantRepo.findOne({
           where: { id: item.productVariantId },
+          relations: ['product'],
         });
         if (!variant) throw new NotFoundException('ProductVariant not found');
+
+        // Lấy giá gốc từ variant (priceOverride hoặc product.price)
+        const originalPrice = variant.priceOverride 
+          ? parseFloat(String(variant.priceOverride))
+          : parseFloat(String(variant.product?.price || 0));
+        
+        if (!originalPrice || originalPrice <= 0) {
+          throw new NotFoundException(`Product variant ${item.productVariantId} has no valid price`);
+        }
+
+        // Tính salePrice dựa trên discountType
+        const salePrice = item.discountType === 'PERCENT'
+          ? originalPrice * (1 - item.discountValue / 100)
+          : originalPrice - item.discountValue;
 
         return this.flashSaleItemRepo.create({
           flashSale: { id },
           productVariant: { id: item.productVariantId },
           productId: variant.productId,
-          salePrice:
-            item.discountType === 'PERCENT'
-              ? item.originalPrice * (1 - item.discountValue / 100)
-              : item.originalPrice - item.discountValue,
+          salePrice: Math.max(0, salePrice), // Đảm bảo salePrice không âm
           discountPercent:
             item.discountType === 'PERCENT' ? item.discountValue : undefined,
           quantity: item.quantity ?? 0,

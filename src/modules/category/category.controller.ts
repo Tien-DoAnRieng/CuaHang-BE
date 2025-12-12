@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Patch} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
@@ -44,16 +44,16 @@ export class CategoryController {
     return this.categoryService.create(dto);
   }
 
-  @Put(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Cập nhật danh mục (Admin)' })
-  @ApiBody({ type: UpdateCategoryDto })
-  @ApiResponse({ status: 200, description: 'Cập nhật danh mục thành công.' })
-  async update(@Param('id') id: string, @Body() dto: UpdateCategoryDto): Promise<Category> {
-    return this.categoryService.update(id, dto);
-  }
+ @Patch(':id')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.ADMIN)
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Cập nhật danh mục (Admin) - PATCH' })
+@ApiBody({ type: UpdateCategoryDto })
+@ApiResponse({ status: 200, description: 'Cập nhật danh mục thành công.' })
+async partialUpdate(@Param('id') id: string, @Body() dto: UpdateCategoryDto): Promise<Category> {
+  return this.categoryService.update(id, dto); // gọi lại service update
+}
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Product } from '../../shared/schemas/entities/product.entity';
 import { Category } from '../../shared/schemas/entities/category.entity';
+import { Brand } from '../../shared/schemas/entities/brand.entity';
 import { Color } from '../../shared/schemas/entities/color.entity';
 import { Size } from '../../shared/schemas/entities/size.entity';
 import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
@@ -31,6 +32,7 @@ import { ProductVariantService } from '../product-variant/services/product-varia
     TypeOrmModule.forFeature([
       Product,
       Category,
+      Brand,
       Color,
       Size,
       ProductVariant,

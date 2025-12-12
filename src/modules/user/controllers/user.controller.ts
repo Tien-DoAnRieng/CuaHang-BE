@@ -11,8 +11,6 @@ import { RoleEnum } from '../../../common/enums/role.enum';
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
-
-  // Admin: search & pagination
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get()
@@ -25,9 +23,6 @@ export class UserController {
   async findAll(@Query('search') search?: string, @Query('page') page = 1, @Query('limit') limit = 10) {
     return this.userService.findAll({ search, page: Number(page), limit: Number(limit) });
   }
-
-  // Admin: get user detail
-  // Get current user's profile
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiBearerAuth('access-token')
@@ -36,8 +31,6 @@ export class UserController {
     const userId = req.user?.id;
     return this.userService.findOne(userId);
   }
-
-  // Update current user's profile (name and/or password)
   @UseGuards(JwtAuthGuard)
   @Patch('me')
   @ApiBearerAuth('access-token')
@@ -46,8 +39,6 @@ export class UserController {
     const userId = req.user?.id;
     return this.userService.updateProfile(userId, dto);
   }
-
-  // Admin: get user detail
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Get(':id')
@@ -58,8 +49,6 @@ export class UserController {
   async findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
-
-  // Admin: xóa user
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Delete(':id')
@@ -71,4 +60,21 @@ export class UserController {
     await this.userService.remove(id);
     return { success: true };
   }
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.ADMIN)
+@Patch(':id/block')
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Admin: Chặn không cho user đăng nhập' })
+async blockUser(@Param('id') id: string) {
+  return this.userService.blockUser(id);
+}
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(RoleEnum.ADMIN)
+@Patch(':id/unblock')
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Admin: Mở khóa cho user đăng nhập lại' })
+async unblockUser(@Param('id') id: string) {
+  return this.userService.unblockUser(id);
+}
+
 }

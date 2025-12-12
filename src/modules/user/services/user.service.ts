@@ -2,8 +2,6 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-
-// ⬇️ SỬA LỖI IMPORT: Role phải import từ role.entity
 import { User } from '../../../shared/schemas/entities/user.entity'; 
 import { Role } from '../../../shared/schemas/entities/role.entity'; 
 
@@ -12,20 +10,15 @@ export class UserService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-    @InjectRepository(Role) // Inject Role Repository
+    @InjectRepository(Role) 
     private rolesRepository: Repository<Role>,
   ) {}
-
-  // ⬇️ SỬA LỖI TS2322: Đổi Promise<User | undefined> thành Promise<User | null>
   async findOneByEmail(email: string): Promise<User | null> {
-    //                                      ^^^^^^^^^^^^
     return this.usersRepository.findOne({
       where: { email },
-      relations: ['role'], // Quan trọng: JOIN dữ liệu Role
+      relations: ['role'],
     });
   }
-
-  /** Admin: Tìm kiếm & phân trang người dùng */
   async findAll({ search, page = 1, limit = 10 }: { search?: string; page?: number; limit?: number }) {
     const where = search
       ? [
@@ -47,28 +40,19 @@ export class UserService {
   async findOne(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
   }
-
-  // ⬇️ SỬA LỖI TS2322: Đổi Promise<Role | undefined> thành Promise<Role | null>
-  async findRoleByName(name: string): Promise<Role | null> {
-    //                                      ^^^^^^^^^^^^
+ async findRoleByName(name: string): Promise<Role | null> {                              
     return this.rolesRepository.findOneBy({ name });
   }
-
-  // Hàm tạo user (sẽ được gọi bởi AuthService)
   async create(userData: Partial<User>): Promise<User> {
     const newUser = this.usersRepository.create(userData);
     return this.usersRepository.save(newUser);
   }
- 
-  /** Admin: xóa user */
   async remove(id: string): Promise<void> {
     const result = await this.usersRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`User ${id} not found`);
     }
   }
-
-  /** User cập nhật profile (tên + đổi mật khẩu) */
   async updateProfile(
     userId: string,
     dto: { name?: string; currentPassword?: string; newPassword?: string; confirmNewPassword?: string; phone?: string; gender?: 'MALE' | 'FEMALE' | 'OTHER'; dateOfBirth?: string },
@@ -79,11 +63,9 @@ export class UserService {
     const { name, currentPassword, newPassword, confirmNewPassword, phone, gender, dateOfBirth } = dto;
 
     if (newPassword) {
-      // require currentPassword
       if (!currentPassword) throw new BadRequestException('currentPassword is required to change password');
       if (!confirmNewPassword) throw new BadRequestException('confirmNewPassword is required to change password');
       if (newPassword !== confirmNewPassword) throw new BadRequestException('newPassword and confirmNewPassword do not match');
-      // Ensure user has a stored password (OAuth users may not)
       if (!user.passwordHash) {
         throw new BadRequestException('User does not have a password set');
       }
@@ -109,7 +91,6 @@ export class UserService {
       if (dateOfBirth === '' || dateOfBirth === null) {
         user.dateOfBirth = null;
       } else {
-        // Accept either ISO YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY
         let d: Date | null = null;
         const isoRe = /^\d{4}-\d{2}-\d{2}$/;
         const dmyRe = /^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/;
@@ -118,13 +99,11 @@ export class UserService {
         } else if (dmyRe.test(dateOfBirth)) {
           const sep = dateOfBirth.includes('/') ? '/' : '-';
           const parts = dateOfBirth.split(sep);
-          // parts: [DD, MM, YYYY]
           const day = parseInt(parts[0], 10);
           const month = parseInt(parts[1], 10) - 1;
           const year = parseInt(parts[2], 10);
           d = new Date(year, month, day);
         } else {
-          // fallback: attempt Date parsing
           d = new Date(dateOfBirth);
         }
 
@@ -135,4 +114,27 @@ export class UserService {
 
     return this.usersRepository.save(user);
   }
+async blockUser(id: string) {
+  const user = await this.usersRepository.findOne({ where: { id } });
+  if (!user) throw new NotFoundException('User not found');
+
+  if (user.isBlocked) throw new BadRequestException('User already blocked');
+
+  user.isBlocked = true;
+  await this.usersRepository.save(user);
+
+  return { success: true, message: 'User has been blocked' };
+}
+async unblockUser(id: string) {
+  const user = await this.usersRepository.findOne({ where: { id } });
+  if (!user) throw new NotFoundException('User not found');
+
+  if (!user.isBlocked) throw new BadRequestException('User is not blocked');
+
+  user.isBlocked = false;
+  await this.usersRepository.save(user);
+
+  return { success: true, message: 'User has been unblocked' };
+}
+
 }

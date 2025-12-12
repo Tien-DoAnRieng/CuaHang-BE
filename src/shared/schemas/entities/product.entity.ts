@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../shared/schemas/base.entity';
 import { Category } from './category.entity';
+import { Brand } from './brand.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductImage } from './product-image.entity';
 import { FlashSale } from './flash-sale.entity';
@@ -17,8 +18,11 @@ export class Product extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column()
-  brand: string;
+  @Column({ nullable: true })
+  brand: string; // Giữ lại để backward compatibility
+
+  @Column({ name: 'brand_id', nullable: true })
+  brandId: string;
 
   @Column({ name: 'category_id' })
   categoryId: string;
@@ -28,12 +32,20 @@ export class Product extends BaseEntity {
 
   @Column({ default: false })
   hasVariants: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  image: string; // Thêm field image để lưu URL ảnh chính
+
   @OneToMany(() => FlashSale, flashSale => flashSale.product)
 flashSales: FlashSale[];
 
   @ManyToOne(() => Category)
   @JoinColumn({ name: 'category_id' })
   category: Category;
+
+  @ManyToOne(() => Brand, { nullable: true })
+  @JoinColumn({ name: 'brand_id' })
+  brandEntity: Brand;
 
   @OneToMany(() => ProductVariant, variant => variant.product)
   variants: ProductVariant[];

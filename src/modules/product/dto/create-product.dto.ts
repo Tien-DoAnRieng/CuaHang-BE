@@ -25,12 +25,12 @@ export class CreateProductDto {
   @IsString() name: string;
   @IsString() @IsOptional() description?: string;
   @IsNumber() price: number;
-  @IsString() brand: string;
+  @IsString() @IsOptional() brand?: string; // Giữ lại để backward compatibility
+  @IsString() @IsOptional() brandId?: string; // Thêm brandId
   @IsString() category: string;
   @IsOptional() status?: string;
-
-  // Variant
   @IsBoolean() @IsOptional() hasVariants?: boolean;
+  @IsString() @IsOptional() imageUrl?: string; // Thêm imageUrl
   @IsArray() @ValidateNested({ each: true }) @Type(() => VariantDto) @IsOptional()
   variants?: VariantDto[];
 }

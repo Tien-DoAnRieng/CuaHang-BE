@@ -26,6 +26,8 @@ import { ConfigService } from '@nestjs/config';
 import { AddressModule } from './modules/order/adrees.module';
 import { FlashSaleModule } from './modules/flash-sale/flash-sale.module';
 import { ColorSizeModule } from './modules/color-size/color-size.module';
+import { BrandModule } from './modules/brand/brand.module';
+import { MemberTypeModule } from './modules/member-type/member-type.module';
 @Module({
   imports: [
 
@@ -38,6 +40,7 @@ import { ColorSizeModule } from './modules/color-size/color-size.module';
   ProductModule,
   PaymentModule,
   CategoryModule,
+  BrandModule,
   ProductImageModule,
   ProductVariantModule,
   CartModule,
@@ -51,7 +54,8 @@ import { ColorSizeModule } from './modules/color-size/color-size.module';
   DashboardModule,
   BannerModule,
   FlashSaleModule,
-  ColorSizeModule
+  ColorSizeModule,
+  MemberTypeModule
   ],
   controllers: [AppController],
   providers: [AppService],

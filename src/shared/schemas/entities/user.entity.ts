@@ -21,6 +21,8 @@ passwordHash: string | null;
 
   @Column({ default: false })
   isVerified: boolean;
+  @Column({ name: 'is_blocked', type: 'boolean', default: false })
+isBlocked: boolean;
 
   @Column({ type: 'varchar', length: 6, nullable: true })
   otp: string | null;

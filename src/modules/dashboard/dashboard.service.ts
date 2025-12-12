@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Order } from '../../shared/schemas/entities/order.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
 import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
+import { Payment } from '../../shared/schemas/entities/payment.entity';
 import * as ExcelJS from 'exceljs';
 import { parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import {
@@ -20,6 +21,7 @@ export class DashboardService {
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
   ) {}
   async getOverview(): Promise<OverviewDto> {
     const currentMonth = new Date().getMonth() + 1;
@@ -276,4 +278,48 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
   return data;
 }
 
+  // Doanh thu theo phương thức thanh toán
+  async getRevenueByPaymentMethod(): Promise<{ method: string; amount: number; percentage: number }[]> {
+    const result = await this.paymentRepo
+      .createQueryBuilder('payment')
+      .leftJoin('payment.order', 'order')
+      .select('payment.paymentMethod', 'method')
+      .addSelect('SUM(order.totalAmount)', 'amount')
+      .where('payment.status = :status', { status: 'SUCCESS' })
+      .groupBy('payment.paymentMethod')
+      .getRawMany();
+
+    const total = result.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+    return result.map((r) => ({
+      method: r.method || 'Không xác định',
+      amount: Number(r.amount || 0),
+      percentage: total > 0 ? (Number(r.amount || 0) / total) * 100 : 0,
+    }));
+  }
+
+  // Phân bổ thanh toán hôm nay
+  async getTodayPaymentDistribution(): Promise<{ method: string; amount: number; count: number }[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const result = await this.paymentRepo
+      .createQueryBuilder('payment')
+      .leftJoin('payment.order', 'order')
+      .select('payment.paymentMethod', 'method')
+      .addSelect('SUM(order.totalAmount)', 'amount')
+      .addSelect('COUNT(payment.id)', 'count')
+      .where('payment.paymentTime >= :start', { start: today })
+      .andWhere('payment.paymentTime < :end', { end: tomorrow })
+      .andWhere('payment.status = :status', { status: 'SUCCESS' })
+      .groupBy('payment.paymentMethod')
+      .getRawMany();
+
+    return result.map((r) => ({
+      method: r.method || 'Không xác định',
+      amount: Number(r.amount || 0),
+      count: Number(r.count || 0),
+    }));
+  }
 }

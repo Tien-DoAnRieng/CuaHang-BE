@@ -89,5 +89,14 @@ export class ProductVariantController {
     const stock = await this.productService.getStock(id);
     return { productId: id, stock };
   }
+@Public()
+@Get('product/:productId')
+@ApiOperation({ summary: 'Lấy toàn bộ biến thể của 1 sản phẩm' })
+async getVariantsByProduct(@Param('productId') productId: string) {
+  return this.variantRepository.find({
+    where: { productId },
+    relations: ['product', 'color', 'size'],
+  });
+}
 
 }

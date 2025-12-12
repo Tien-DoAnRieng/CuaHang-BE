@@ -122,4 +122,16 @@ async getMonthlyRevenueFiltered(@Query('year') year?: string) {
   return this.dashboardService.getMonthlyRevenue(y);
 }
 
+@Get('revenue-by-payment-method')
+@ApiOperation({ summary: 'Doanh thu theo phương thức thanh toán' })
+async getRevenueByPaymentMethod() {
+  return this.dashboardService.getRevenueByPaymentMethod();
+}
+
+@Get('today-payment-distribution')
+@ApiOperation({ summary: 'Phân bổ thanh toán hôm nay' })
+async getTodayPaymentDistribution() {
+  return this.dashboardService.getTodayPaymentDistribution();
+}
+
 }

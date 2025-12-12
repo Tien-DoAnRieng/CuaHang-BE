@@ -138,5 +138,11 @@ export class ProductController {
     const l = limit ? Number(limit) : 20;
     return this.productAnalyticsService.getTopSellingAdmin({ page: p, limit: l, from, to, categoryId });
   }
+@Public()
+@Get('with-relations/list')
+@ApiOperation({ summary: 'Lấy danh sách sản phẩm kèm biến thể + màu + size + ảnh' })
+async findAllWithRelations(@Query() query: any) {
+  return this.productService.findAllWithRelations(query);
+}
 
 }
