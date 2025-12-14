@@ -46,11 +46,15 @@ export class ReviewController {
   @Roles(RoleEnum.ADMIN)
   @ApiBearerAuth('access-token')
   @Get()
-  @ApiOperation({ summary: 'Admin: Xem tất cả đánh giá (phân trang, tìm kiếm)' })
+  @ApiOperation({ summary: 'Admin: Xem tất cả đánh giá (phân trang, tìm kiếm, filter theo status)' })
   async findAllAdmin(@Query() q: QueryReviewDto) {
     const page = Number(q.page) || 1;
     const limit = Number(q.limit) || 20;
-    return this.reviewService.findAllAdmin({ productId: q.productId, userId: q.userId }, page, limit);
+    return this.reviewService.findAllAdmin({ 
+      productId: q.productId, 
+      userId: q.userId,
+      status: q.status 
+    }, page, limit);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -81,5 +85,45 @@ export class ReviewController {
   @ApiOperation({ summary: 'Admin: Xoá đánh giá vi phạm' })
   async adminRemove(@Param('id') id: string) {
     return this.reviewService.remove(id, undefined, true);
+  }
+
+  // Admin approve review
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @ApiBearerAuth('access-token')
+  @Post('admin/:id/approve')
+  @ApiOperation({ summary: 'Admin: Duyệt đánh giá' })
+  async approveReview(@Param('id') id: string) {
+    return this.reviewService.approveReview(id);
+  }
+
+  // Admin reject/violate review
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @ApiBearerAuth('access-token')
+  @Post('admin/:id/reject')
+  @ApiOperation({ summary: 'Admin: Từ chối/Đánh dấu vi phạm đánh giá' })
+  async rejectReview(@Param('id') id: string) {
+    return this.reviewService.rejectReview(id);
+  }
+
+  // Admin mark as violated
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @ApiBearerAuth('access-token')
+  @Post('admin/:id/violate')
+  @ApiOperation({ summary: 'Admin: Đánh dấu đánh giá vi phạm' })
+  async markAsViolated(@Param('id') id: string) {
+    return this.reviewService.markAsViolated(id);
+  }
+
+  // Admin add reply to review
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @ApiBearerAuth('access-token')
+  @Post('admin/:id/reply')
+  @ApiOperation({ summary: 'Admin: Phản hồi đánh giá' })
+  async addReply(@Param('id') id: string, @Body() body: { reply: string }) {
+    return this.reviewService.addReply(id, body.reply);
   }
 }

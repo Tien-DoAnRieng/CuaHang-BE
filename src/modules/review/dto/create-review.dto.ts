@@ -1,4 +1,4 @@
-import { IsString, IsInt, Min, Max, IsOptional } from 'class-validator';
+import { IsString, IsInt, Min, Max, IsOptional, Length, Matches, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateReviewDto {
@@ -14,6 +14,15 @@ export class CreateReviewDto {
 
   @IsOptional()
   @IsString()
-  @ApiProperty({ example: 'Sản phẩm tốt, giao nhanh', required: false })
+  @Length(0, 1000, { message: 'Bình luận không được vượt quá 1000 ký tự' })
+  @ValidateIf((o) => o.comment !== undefined && o.comment !== null && o.comment !== '')
+  @Matches(/^[^<>{}[\]\\|`]*$/, {
+    message: 'Bình luận không được chứa các ký tự: < > { } [ ] \\ | `',
+  })
+  @ApiProperty({ 
+    example: 'Sản phẩm tốt, giao nhanh', 
+    required: false,
+    description: 'Bình luận (tối đa 1000 ký tự, không chứa ký tự đặc biệt nguy hiểm)'
+  })
   comment?: string;
 }

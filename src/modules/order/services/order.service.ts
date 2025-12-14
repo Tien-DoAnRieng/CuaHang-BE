@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Order } from '../../../shared/schemas/entities/order.entity';
@@ -11,9 +11,13 @@ import { User } from '../../../shared/schemas/entities/user.entity';
 import { ProductVariant } from '../../../shared/schemas/entities/product-variant.entity';
 import { Product } from '../../../shared/schemas/entities/product.entity';
 import { Address } from '../../../shared/schemas/entities/address.entity';
+import { QueueService } from '../../queue/queue.service';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
@@ -29,6 +33,8 @@ export class OrderService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Address)
     private readonly addressRepository: Repository<Address>,
+    private readonly queueService: QueueService,
+    private readonly mailerService: MailerService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -150,6 +156,7 @@ export class OrderService {
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
+      relations: ['user', 'shippingAddress', 'items'],
     });
     return { data, total, page, limit };
   }
@@ -164,10 +171,16 @@ export class OrderService {
   }
 
   async findOne(id: string): Promise<Order | null> {
-    return await this.orderRepository.findOne({ where: { id } });
+    return await this.orderRepository.findOne({ 
+      where: { id },
+      relations: ['user', 'shippingAddress', 'items', 'items.variant', 'items.variant.product'],
+    });
   }
   async updateStatus(id: string, status: OrderStatus): Promise<Order | null> {
-    const order = await this.orderRepository.findOne({ where: { id } });
+    const order = await this.orderRepository.findOne({ 
+      where: { id },
+      relations: ['user']
+    });
     if (!order) return null;
     const allowed: Record<string, string[]> = {
       [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.PAID],
@@ -182,14 +195,52 @@ export class OrderService {
     const allowedNext = allowed[order.status] || [];
     if (!allowedNext.includes(status)) throw new BadRequestException('Invalid status transition');
 
+    const oldStatus = order.status;
     order.status = status;
     const saved = await this.orderRepository.save(order);
+    
     if (status === OrderStatus.PAID) {
       const payments = await this.paymentRepository.find({ where: { orderId: id } });
       for (const p of payments) {
         p.status = 'COMPLETED';
         p.paymentTime = new Date();
         await this.paymentRepository.save(p);
+      }
+    }
+
+    // Gửi email thông báo khi trạng thái thay đổi (chỉ khi status thực sự thay đổi)
+    if (oldStatus !== status && order.user?.email) {
+      const emailData = {
+        to: order.user.email,
+        customerName: order.user.name || order.user.email,
+        orderId: id,
+        status: status,
+        orderTotal: order.totalAmount || 0,
+      };
+
+      try {
+        await this.queueService.addOrderStatusEmailJob(emailData);
+        this.logger.debug(`✅ Email queued for order ${id} status change`);
+      } catch (error: any) {
+        // Nếu queue fail (Redis không có), thử gửi trực tiếp
+        if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('redis')) {
+          this.logger.warn(`⚠️ Redis unavailable, sending email directly for order ${id}`);
+          try {
+            await this.sendEmailDirectly(
+              emailData.to,
+              emailData.customerName,
+              emailData.orderId,
+              emailData.status,
+              emailData.orderTotal
+            );
+            this.logger.log(`✅ Email sent directly (Redis unavailable) for order ${id}`);
+          } catch (directError: any) {
+            // Log lỗi nhưng không throw để không ảnh hưởng đến việc update status
+            this.logger.error(`❌ Failed to send email (both queue and direct):`, directError);
+          }
+        } else {
+          this.logger.error(`❌ Failed to queue order status email:`, error);
+        }
       }
     }
 
@@ -202,5 +253,98 @@ export class OrderService {
       await manager.delete(Payment, { orderId: id });
       await manager.delete(Order, { id });
     });
+  }
+
+  // Helper: Gửi email trực tiếp (fallback khi queue không hoạt động)
+  private async sendEmailDirectly(to: string, customerName: string, orderId: string, status: string, orderTotal: number): Promise<void> {
+    const statusMap: Record<string, string> = {
+      'PENDING': 'Đang chờ xử lý',
+      'PROCESSING': 'Đang xử lý',
+      'PAID': 'Đã thanh toán',
+      'SHIPPED': 'Đã giao hàng',
+      'DELIVERED': 'Đã nhận hàng',
+      'COMPLETED': 'Hoàn thành',
+      'CANCELLED': 'Đã hủy',
+      'REFUNDED': 'Đã hoàn tiền',
+    };
+
+    const statusText = statusMap[status] || status;
+
+    await this.mailerService.sendMail({
+      to,
+      subject: `Thông báo cập nhật trạng thái đơn hàng #${orderId}`,
+      template: 'order-status',
+      context: {
+        customerName: customerName || 'Quý khách',
+        orderId,
+        status: statusText,
+        orderTotal: orderTotal.toLocaleString('vi-VN'),
+      },
+    });
+  }
+
+  // Gửi email thông báo trạng thái đơn hàng thủ công (không cần đổi status)
+  async sendOrderStatusEmail(id: string): Promise<{ success: boolean; message: string }> {
+    const order = await this.orderRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (!order.user?.email) {
+      throw new BadRequestException('Order does not have customer email');
+    }
+
+    const emailData = {
+      to: order.user.email,
+      customerName: order.user.name || order.user.email,
+      orderId: id,
+      status: order.status,
+      orderTotal: order.totalAmount || 0,
+    };
+
+    // Thử gửi qua queue trước
+    try {
+      await this.queueService.addOrderStatusEmailJob(emailData);
+      this.logger.log(`✅ Email queued successfully for order ${id}`);
+      return {
+        success: true,
+        message: `Email đã được gửi thành công đến ${order.user.email}`,
+      };
+    } catch (error: any) {
+      this.logger.warn(`⚠️ Queue failed, trying direct email send:`, error);
+      
+      // Nếu queue fail (Redis không có), thử gửi trực tiếp
+      if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('redis')) {
+        try {
+          await this.sendEmailDirectly(
+            emailData.to,
+            emailData.customerName,
+            emailData.orderId,
+            emailData.status,
+            emailData.orderTotal
+          );
+          this.logger.log(`✅ Email sent directly (Redis unavailable) for order ${id}`);
+          return {
+            success: true,
+            message: `Email đã được gửi trực tiếp đến ${order.user.email} (Redis không khả dụng, đã gửi trực tiếp)`,
+          };
+        } catch (directError: any) {
+          this.logger.error(`❌ Direct email send also failed:`, directError);
+          throw new BadRequestException(
+            'Không thể gửi email. Vui lòng kiểm tra:\n' +
+            '1. Cấu hình email trong .env (SMTP settings)\n' +
+            '2. Hoặc cài đặt Redis để sử dụng queue system\n' +
+            `Chi tiết lỗi: ${directError?.message || 'Unknown error'}`
+          );
+        }
+      }
+      
+      // Lỗi khác
+      throw new BadRequestException(`Không thể gửi email: ${error?.message || 'Vui lòng thử lại sau.'}`);
+    }
   }
 }

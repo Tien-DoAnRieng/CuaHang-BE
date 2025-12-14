@@ -5,6 +5,7 @@ import { Order } from '../../shared/schemas/entities/order.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
 import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
 import { Payment } from '../../shared/schemas/entities/payment.entity';
+import { Product } from '../../shared/schemas/entities/product.entity';
 import * as ExcelJS from 'exceljs';
 import { parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import {
@@ -22,6 +23,7 @@ export class DashboardService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(OrderItem) private orderItemRepo: Repository<OrderItem>,
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+    @InjectRepository(Product) private productRepo: Repository<Product>,
   ) {}
   async getOverview(): Promise<OverviewDto> {
     const currentMonth = new Date().getMonth() + 1;
@@ -132,15 +134,35 @@ export class DashboardService {
       .getMany();
   }
 async exportRevenueExcel(
-  type: 'month' | 'year' | 'week',
+  type: 'day' | 'month' | 'year' | 'week',
   months?: number[],
   years?: number[],
   weeks?: number[],
+  date?: string,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Revenue');
 
-  sheet.addRow(['Month/Week/Year', 'Revenue', 'Target']);
+  sheet.addRow(['Date/Month/Week/Year', 'Revenue', 'Target']);
+
+  if (type === 'day' && date) {
+    const targetDate = parseISO(date);
+    const dayStart = new Date(targetDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(targetDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    
+    const result = await this.orderRepo
+      .createQueryBuilder('order')
+      .select('SUM(order.totalAmount)', 'total')
+      .where('order.createdAt BETWEEN :start AND :end', {
+        start: dayStart,
+        end: dayEnd,
+      })
+      .getRawOne();
+    
+    sheet.addRow([date, Number(result?.total || 0), 0]);
+  }
 
   if (type === 'month') {
     const data = await this.getMonthlyRevenue();
@@ -168,7 +190,7 @@ async exportRevenueExcel(
     const data = await this.getWeeklyGrowth();
     data.forEach(d => {
       if (!weeks || weeks.includes(d.week)) {
-        sheet.addRow([d.week, d.revenue, 0]);
+        sheet.addRow([`Tuần ${d.week}`, d.revenue, 0]);
       }
     });
   }
@@ -280,7 +302,8 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
 
   // Doanh thu theo phương thức thanh toán
   async getRevenueByPaymentMethod(): Promise<{ method: string; amount: number; percentage: number }[]> {
-    const result = await this.paymentRepo
+    // Thử query từ payment trước
+    let result = await this.paymentRepo
       .createQueryBuilder('payment')
       .leftJoin('payment.order', 'order')
       .select('payment.paymentMethod', 'method')
@@ -288,6 +311,17 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
       .where('payment.status = :status', { status: 'SUCCESS' })
       .groupBy('payment.paymentMethod')
       .getRawMany();
+
+    // Nếu không có dữ liệu từ payment, lấy từ orders
+    if (!result || result.length === 0) {
+      result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('order.paymentMethod', 'method')
+        .addSelect('SUM(order.totalAmount)', 'amount')
+        .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
+        .groupBy('order.paymentMethod')
+        .getRawMany();
+    }
 
     const total = result.reduce((acc, r) => acc + Number(r.amount || 0), 0);
     return result.map((r) => ({
@@ -304,7 +338,8 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const result = await this.paymentRepo
+    // Thử query từ payment trước
+    let result = await this.paymentRepo
       .createQueryBuilder('payment')
       .leftJoin('payment.order', 'order')
       .select('payment.paymentMethod', 'method')
@@ -316,10 +351,50 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
       .groupBy('payment.paymentMethod')
       .getRawMany();
 
+    // Nếu không có dữ liệu từ payment, lấy từ orders
+    if (!result || result.length === 0) {
+      result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('order.paymentMethod', 'method')
+        .addSelect('SUM(order.totalAmount)', 'amount')
+        .addSelect('COUNT(order.id)', 'count')
+        .where('order.createdAt >= :start', { start: today })
+        .andWhere('order.createdAt < :end', { end: tomorrow })
+        .andWhere('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
+        .groupBy('order.paymentMethod')
+        .getRawMany();
+    }
+
     return result.map((r) => ({
       method: r.method || 'Không xác định',
       amount: Number(r.amount || 0),
       count: Number(r.count || 0),
+    }));
+  }
+
+  // Sản phẩm bán chạy
+  async getTopProducts(limit: number = 10): Promise<{ id: string; name: string; sold: number; revenue: number }[]> {
+    const result = await this.orderItemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.variant', 'variant')
+      .leftJoin('variant.product', 'product')
+      .leftJoin('item.order', 'order')
+      .select('product.id', 'id')
+      .addSelect('product.name', 'name')
+      .addSelect('SUM(item.quantity)', 'sold')
+      .addSelect('SUM(item.priceAtTime * item.quantity)', 'revenue')
+      .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
+      .groupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy('sold', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return result.map((r) => ({
+      id: r.id,
+      name: r.name || 'Sản phẩm không tên',
+      sold: Number(r.sold || 0),
+      revenue: Number(r.revenue || 0),
     }));
   }
 }

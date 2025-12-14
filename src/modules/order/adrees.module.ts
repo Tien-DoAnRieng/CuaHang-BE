@@ -11,9 +11,37 @@ import { ProductVariant } from '../../shared/schemas/entities/product-variant.en
 import { Product } from '../../shared/schemas/entities/product.entity';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
+import { QueueModule } from '../queue/queue.module';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { join } from 'path';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Address, Order, OrderItem, Payment, User, ProductVariant, Product])],
+  imports: [
+    TypeOrmModule.forFeature([Address, Order, OrderItem, Payment, User, ProductVariant, Product]),
+    QueueModule,
+    MailerModule.forRoot({
+      transport: {
+        host: process.env.MAIL_HOST || 'smtp.gmail.com',
+        port: Number(process.env.MAIL_PORT) || 587,
+        secure: false,
+        auth: {
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASSWORD,
+        },
+      },
+      defaults: {
+        from: `"E-Commerce Admin" <${process.env.MAIL_USER || 'noreply@example.com'}>`,
+      },
+      template: {
+        dir: join(process.cwd(), 'src/modules/auth/templates'),
+        adapter: new HandlebarsAdapter(),
+        options: {
+          strict: true,
+        },
+      },
+    }),
+  ],
   controllers: [AddressController, OrderController],
   providers: [AddressService, OrderService],
   exports: [AddressService, OrderService],

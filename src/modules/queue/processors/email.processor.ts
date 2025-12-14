@@ -30,4 +30,44 @@ export class EmailProcessor {
       throw err;
     }
   }
+
+  @Process('send-order-status')
+  async handleOrderStatusEmail(job: Job<{ to: string; customerName: string; orderId: string; status: string; orderTotal: number }>) {
+    const { to, customerName, orderId, status, orderTotal } = job.data;
+
+    this.logger.debug(`📧 Gửi email thông báo trạng thái đơn hàng đến: ${to}`);
+
+    try {
+      // Map status to Vietnamese
+      const statusMap: Record<string, string> = {
+        'PENDING': 'Đang chờ xử lý',
+        'PROCESSING': 'Đang xử lý',
+        'PAID': 'Đã thanh toán',
+        'SHIPPED': 'Đã giao hàng',
+        'DELIVERED': 'Đã nhận hàng',
+        'COMPLETED': 'Hoàn thành',
+        'CANCELLED': 'Đã hủy',
+        'REFUNDED': 'Đã hoàn tiền',
+      };
+
+      const statusText = statusMap[status] || status;
+
+      await this.mailerService.sendMail({
+        to,
+        subject: `Thông báo cập nhật trạng thái đơn hàng #${orderId}`,
+        template: 'order-status',
+        context: {
+          customerName: customerName || 'Quý khách',
+          orderId,
+          status: statusText,
+          orderTotal: orderTotal.toLocaleString('vi-VN'),
+        },
+      });
+
+      this.logger.log(`✅ Gửi email thông báo trạng thái đơn hàng thành công tới ${to}`);
+    } catch (err) {
+      this.logger.error(`❌ Gửi email thông báo trạng thái đơn hàng thất bại tới ${to}`, err);
+      throw err;
+    }
+  }
 }

@@ -47,16 +47,31 @@ export class FlashSaleService {
           throw new NotFoundException(`Product variant ${item.productVariantId} has no valid price`);
         }
 
+        // Validate discountValue
+        if (item.discountType === 'PERCENT' && (item.discountValue < 0 || item.discountValue > 100)) {
+          throw new NotFoundException(`Discount percent must be between 0 and 100`);
+        }
+        if (item.discountType === 'AMOUNT' && item.discountValue < 0) {
+          throw new NotFoundException(`Discount amount must be positive`);
+        }
+
         // Tính salePrice dựa trên discountType
-        const salePrice = item.discountType === 'PERCENT'
-          ? originalPrice * (1 - item.discountValue / 100)
-          : originalPrice - item.discountValue;
+        let salePrice: number;
+        if (item.discountType === 'PERCENT') {
+          salePrice = originalPrice * (1 - item.discountValue / 100);
+        } else {
+          // AMOUNT: giảm giá cố định
+          salePrice = originalPrice - item.discountValue;
+        }
+
+        // Làm tròn đến 2 chữ số thập phân và đảm bảo không âm
+        salePrice = Math.max(0, Math.round(salePrice * 100) / 100);
 
         return this.flashSaleItemRepo.create({
           flashSale: { id: saved.id },
           productVariant: { id: item.productVariantId },
           productId: variant.productId,
-          salePrice: Math.max(0, salePrice), // Đảm bảo salePrice không âm
+          salePrice: salePrice,
           discountPercent:
             item.discountType === 'PERCENT' ? item.discountValue : undefined,
           quantity: item.quantity ?? 0,
@@ -112,16 +127,31 @@ export class FlashSaleService {
           throw new NotFoundException(`Product variant ${item.productVariantId} has no valid price`);
         }
 
+        // Validate discountValue
+        if (item.discountType === 'PERCENT' && (item.discountValue < 0 || item.discountValue > 100)) {
+          throw new NotFoundException(`Discount percent must be between 0 and 100`);
+        }
+        if (item.discountType === 'AMOUNT' && item.discountValue < 0) {
+          throw new NotFoundException(`Discount amount must be positive`);
+        }
+
         // Tính salePrice dựa trên discountType
-        const salePrice = item.discountType === 'PERCENT'
-          ? originalPrice * (1 - item.discountValue / 100)
-          : originalPrice - item.discountValue;
+        let salePrice: number;
+        if (item.discountType === 'PERCENT') {
+          salePrice = originalPrice * (1 - item.discountValue / 100);
+        } else {
+          // AMOUNT: giảm giá cố định
+          salePrice = originalPrice - item.discountValue;
+        }
+
+        // Làm tròn đến 2 chữ số thập phân và đảm bảo không âm
+        salePrice = Math.max(0, Math.round(salePrice * 100) / 100);
 
         return this.flashSaleItemRepo.create({
           flashSale: { id },
           productVariant: { id: item.productVariantId },
           productId: variant.productId,
-          salePrice: Math.max(0, salePrice), // Đảm bảo salePrice không âm
+          salePrice: salePrice,
           discountPercent:
             item.discountType === 'PERCENT' ? item.discountValue : undefined,
           quantity: item.quantity ?? 0,

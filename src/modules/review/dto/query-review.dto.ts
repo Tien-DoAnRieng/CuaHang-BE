@@ -19,4 +19,8 @@ export class QueryReviewDto {
   @IsNumberString()
   @ApiPropertyOptional({ example: '10' })
   limit?: string;
+
+  @IsOptional()
+  @ApiPropertyOptional({ example: 'approved', enum: ['all', 'pending', 'approved', 'violated'] })
+  status?: string;
 }

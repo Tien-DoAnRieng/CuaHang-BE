@@ -19,6 +19,20 @@ export class Review extends BaseEntity {
   @Column({ type: 'text' })
   comment: string;
 
+  @Column({ 
+    type: 'varchar', 
+    length: 20, 
+    default: 'pending',
+    comment: 'Review status: pending, approved, violated'
+  })
+  status: 'pending' | 'approved' | 'violated';
+
+  @Column({ type: 'text', nullable: true })
+  reply: string;
+
+  @Column({ type: 'datetime', nullable: true, name: 'reply_date' })
+  replyDate: Date;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;

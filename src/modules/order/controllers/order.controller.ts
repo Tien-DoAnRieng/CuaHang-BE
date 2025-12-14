@@ -96,4 +96,13 @@ export class OrderController {
   async remove(@Param('id') id: string) {
     return this.orderService.remove(id);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN)
+  @Post(':id/send-email')
+  @ApiOperation({ summary: 'Admin: Gửi email thông báo trạng thái đơn hàng thủ công' })
+  @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng' })
+  async sendOrderEmail(@Param('id') id: string) {
+    return this.orderService.sendOrderStatusEmail(id);
+  }
 }

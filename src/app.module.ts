@@ -28,6 +28,7 @@ import { FlashSaleModule } from './modules/flash-sale/flash-sale.module';
 import { ColorSizeModule } from './modules/color-size/color-size.module';
 import { BrandModule } from './modules/brand/brand.module';
 import { MemberTypeModule } from './modules/member-type/member-type.module';
+import { CouponModule } from './modules/coupon/coupon.module';
 @Module({
   imports: [
 
@@ -55,7 +56,8 @@ import { MemberTypeModule } from './modules/member-type/member-type.module';
   BannerModule,
   FlashSaleModule,
   ColorSizeModule,
-  MemberTypeModule
+  MemberTypeModule,
+  CouponModule
   ],
   controllers: [AppController],
   providers: [AppService],

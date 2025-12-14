@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from '../../../shared/schemas/entities/review.entity';
@@ -11,6 +11,12 @@ import { UpdateReviewDto } from '../dto/update-review.dto';
 
 @Injectable()
 export class ReviewService {
+  // Danh sách từ ngữ không phù hợp (có thể chuyển sang config file)
+  private readonly forbiddenWords = [
+    'spam', 'scam', 'lừa đảo', 'fake', 'giả mạo', 
+    'lừa', 'đảo', 'phản cảm', 'thô tục'
+  ];
+
   constructor(
     @InjectRepository(Review)
     private readonly reviewRepo: Repository<Review>,
@@ -21,6 +27,35 @@ export class ReviewService {
     @InjectRepository(ProductVariant)
     private readonly variantRepo: Repository<ProductVariant>,
   ) {}
+
+  // Helper function để sanitize và validate comment
+  private sanitizeComment(comment: string): string {
+    if (!comment) return '';
+    
+    let sanitized = comment
+      .replace(/[<>{}[\]\\|`]/g, '') // Loại bỏ ký tự nguy hiểm
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Loại bỏ script tags
+      .replace(/<[^>]+>/g, '') // Loại bỏ HTML tags
+      .replace(/\s+/g, ' ') // Chuẩn hóa khoảng trắng
+      .trim();
+    
+    // Giới hạn độ dài
+    if (sanitized.length > 1000) {
+      sanitized = sanitized.substring(0, 1000);
+    }
+    
+    return sanitized;
+  }
+
+  // Helper function để kiểm tra từ ngữ không phù hợp
+  private validateForbiddenWords(comment: string): void {
+    const lowerComment = comment.toLowerCase();
+    for (const word of this.forbiddenWords) {
+      if (lowerComment.includes(word.toLowerCase())) {
+        throw new BadRequestException(`Bình luận chứa từ ngữ không phù hợp: "${word}"`);
+      }
+    }
+  }
 
   // Ensure user bought the product in a PAID order
   private async userHasPurchasedProduct(userId: string, productId: string): Promise<boolean> {
@@ -43,18 +78,30 @@ export class ReviewService {
     const bought = await this.userHasPurchasedProduct(userId, dto.productId);
     if (!bought) throw new ForbiddenException('Bạn chỉ có thể đánh giá sau khi mua hàng');
 
+    // Validate và sanitize comment
+    let sanitizedComment = '';
+    if (dto.comment) {
+      sanitizedComment = this.sanitizeComment(dto.comment);
+      
+      // Kiểm tra từ ngữ không phù hợp
+      if (sanitizedComment) {
+        this.validateForbiddenWords(sanitizedComment);
+      }
+    }
+
     const r = this.reviewRepo.create({
       productId: dto.productId,
       userId,
       rating: dto.rating,
-      comment: dto.comment || '',
+      comment: sanitizedComment,
+      status: 'pending', // Mặc định là pending, admin sẽ approve
     });
     return this.reviewRepo.save(r);
   }
 
   async findByProduct(productId: string, page = 1, limit = 10) {
     const [data, total] = await this.reviewRepo.findAndCount({
-      where: { productId },
+      where: { productId, status: 'approved' }, // Chỉ hiển thị reviews đã được approve
       relations: ['user'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
@@ -76,10 +123,13 @@ export class ReviewService {
     };
   }
 
-  async findAllAdmin(filters: { productId?: string; userId?: string }, page = 1, limit = 20) {
+  async findAllAdmin(filters: { productId?: string; userId?: string; status?: string }, page = 1, limit = 20) {
     const qb = this.reviewRepo.createQueryBuilder('r').leftJoinAndSelect('r.user', 'user').leftJoinAndSelect('r.product', 'product');
     if (filters.productId) qb.andWhere('r.productId = :productId', { productId: filters.productId });
     if (filters.userId) qb.andWhere('r.userId = :userId', { userId: filters.userId });
+    if (filters.status && filters.status !== 'all') {
+      qb.andWhere('r.status = :status', { status: filters.status });
+    }
     const total = await qb.getCount();
     const data = await qb.orderBy('r.createdAt', 'DESC').skip((page - 1) * limit).take(limit).getMany();
     return { data, total, page, limit };
@@ -89,8 +139,23 @@ export class ReviewService {
     const r = await this.reviewRepo.findOne({ where: { id } });
     if (!r) throw new NotFoundException('Review not found');
     if (r.userId !== userId) throw new ForbiddenException('Không có quyền sửa review này');
+    
     if (dto.rating !== undefined) r.rating = dto.rating;
-    if (dto.comment !== undefined) r.comment = dto.comment;
+    
+    if (dto.comment !== undefined) {
+      // Validate và sanitize comment giống như create
+      let sanitizedComment = '';
+      if (dto.comment) {
+        sanitizedComment = this.sanitizeComment(dto.comment);
+        
+        // Kiểm tra từ ngữ không phù hợp
+        if (sanitizedComment) {
+          this.validateForbiddenWords(sanitizedComment);
+        }
+      }
+      r.comment = sanitizedComment;
+    }
+    
     return this.reviewRepo.save(r);
   }
 
@@ -100,5 +165,35 @@ export class ReviewService {
     if (!isAdmin && r.userId !== userId) throw new ForbiddenException('Không có quyền xóa review này');
     await this.reviewRepo.remove(r);
     return { deleted: true };
+  }
+
+  // Admin methods for review moderation
+  async approveReview(id: string): Promise<Review> {
+    const r = await this.reviewRepo.findOne({ where: { id } });
+    if (!r) throw new NotFoundException('Review not found');
+    r.status = 'approved';
+    return this.reviewRepo.save(r);
+  }
+
+  async rejectReview(id: string): Promise<Review> {
+    const r = await this.reviewRepo.findOne({ where: { id } });
+    if (!r) throw new NotFoundException('Review not found');
+    r.status = 'violated';
+    return this.reviewRepo.save(r);
+  }
+
+  async markAsViolated(id: string): Promise<Review> {
+    const r = await this.reviewRepo.findOne({ where: { id } });
+    if (!r) throw new NotFoundException('Review not found');
+    r.status = 'violated';
+    return this.reviewRepo.save(r);
+  }
+
+  async addReply(id: string, reply: string): Promise<Review> {
+    const r = await this.reviewRepo.findOne({ where: { id } });
+    if (!r) throw new NotFoundException('Review not found');
+    r.reply = reply;
+    r.replyDate = new Date();
+    return this.reviewRepo.save(r);
   }
 }

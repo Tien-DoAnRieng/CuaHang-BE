@@ -62,13 +62,15 @@ export class DashboardController {
 
   @Get('export-revenue')
   @ApiOperation({ summary: 'Xuất Excel doanh thu theo loại' })
-  @ApiQuery({ name: 'type', enum: ['month', 'week', 'year'], required: true })
+  @ApiQuery({ name: 'type', enum: ['day', 'month', 'week', 'year'], required: true })
+  @ApiQuery({ name: 'date', required: false })
   @ApiQuery({ name: 'month', required: false, isArray: true })
   @ApiQuery({ name: 'week', required: false, isArray: true })
   @ApiQuery({ name: 'year', required: false, isArray: true })
   async exportRevenue(
     @Res() res: Response,
-    @Query('type') type: 'month' | 'year' | 'week',
+    @Query('type') type: 'day' | 'month' | 'year' | 'week',
+    @Query('date') date?: string,
     @Query('month') month?: string | string[],
     @Query('week') week?: string | string[],
     @Query('year') year?: string | string[],
@@ -77,7 +79,7 @@ export class DashboardController {
     const weeksArr = this.parseQueryNumbers(week);
     const yearsArr = this.parseQueryNumbers(year);
 
-    const buffer = await this.dashboardService.exportRevenueExcel(type, monthsArr, yearsArr, weeksArr);
+    const buffer = await this.dashboardService.exportRevenueExcel(type, monthsArr, yearsArr, weeksArr, date);
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -132,6 +134,14 @@ async getRevenueByPaymentMethod() {
 @ApiOperation({ summary: 'Phân bổ thanh toán hôm nay' })
 async getTodayPaymentDistribution() {
   return this.dashboardService.getTodayPaymentDistribution();
+}
+
+@Get('top-products')
+@ApiOperation({ summary: 'Sản phẩm bán chạy' })
+@ApiQuery({ name: 'limit', required: false, type: Number })
+async getTopProducts(@Query('limit') limit?: string) {
+  const limitNum = limit ? Number(limit) : 10;
+  return this.dashboardService.getTopProducts(limitNum);
 }
 
 }
