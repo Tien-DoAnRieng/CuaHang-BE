@@ -14,6 +14,12 @@ export class CloudinaryService {
   }
 
   async uploadSingle(file: Express.Multer.File): Promise<UploadApiResponse> {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+    if (!file.buffer || file.buffer.length === 0) {
+      throw new Error('File buffer is empty');
+    }
     return new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream({ resource_type: 'auto' }, (error, result) => {
         if (error || !result) return reject(error || new Error('No result from Cloudinary'));

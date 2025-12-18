@@ -100,7 +100,7 @@ export class AuthService implements OnApplicationBootstrap {
       to: newUser.email,
       subject: 'Mã xác thực tài khoản',
       template: 'verify-email',
-      context: { name: newUser.name, otp },
+      context: { name: newUser.name },
     });
 
     return { message: 'Đăng ký thành công, vui lòng kiểm tra email để lấy mã xác thực' };

@@ -12,8 +12,8 @@ export class ProductVariant extends BaseEntity {
   @Column({ name: 'color_id' })
   colorId: string;
 
-  @Column({ name: 'size_id' })
-  sizeId: string;
+  @Column({ name: 'size_id', nullable: true })
+  sizeId: string | null;
 
   @Column({ name: 'stock_quantity', type: 'int', default: 0 })
   stockQuantity: number;
@@ -30,8 +30,8 @@ export class ProductVariant extends BaseEntity {
 @JoinColumn({ name: 'color_id' })
 color: Color;
 
-@ManyToOne(() => Size)
+@ManyToOne(() => Size, { nullable: true })
 @JoinColumn({ name: 'size_id' })
-size: Size;
+size: Size | null;
 
 }

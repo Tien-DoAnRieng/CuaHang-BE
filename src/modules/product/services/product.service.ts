@@ -53,15 +53,16 @@ export class ProductService {
 
     // Tạo variant nếu có
     if (dto.hasVariants && dto.variants?.length) {
-      // Validate và tạo variants với colorId và sizeId
+      // Validate và tạo variants - cho phép chỉ có colorId (không có sizeId)
       const variants = dto.variants.map(v => {
-        if (!v.colorId || !v.sizeId) {
-          throw new BadRequestException('Variant must have both colorId and sizeId');
+        if (!v.colorId) {
+          throw new BadRequestException('Variant must have colorId');
         }
+        // sizeId là optional - có thể null nếu không chọn size
         return this.variantRepository.create({
           productId: savedProduct.id,
           colorId: v.colorId,
-          sizeId: v.sizeId,
+          sizeId: v.sizeId || null, // Cho phép null nếu không có size
           stockQuantity: v.stockQuantity ?? 0,
           priceOverride: v.priceOverride,
         });
@@ -123,15 +124,18 @@ export class ProductService {
 
     // Thêm variants mới nếu có
     if (dto.hasVariants && variants?.length) {
-      const newVariants = variants.map(v =>
-        this.variantRepository.create({
+      const newVariants = variants.map(v => {
+        if (!v.colorId) {
+          throw new BadRequestException('Variant must have colorId');
+        }
+        return this.variantRepository.create({
           productId: id,
           colorId: v.colorId,
-          sizeId: v.sizeId,
+          sizeId: v.sizeId || null, // Cho phép null nếu không có size
           priceOverride: v.priceOverride ?? 0,
           stockQuantity: v.stockQuantity ?? 0,
-        }),
-      );
+        });
+      });
       await this.variantRepository.save(newVariants);
     }
   }

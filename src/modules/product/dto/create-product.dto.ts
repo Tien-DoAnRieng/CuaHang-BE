@@ -3,9 +3,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class VariantDto {
+  @IsOptional()
   @IsString()
   @ApiProperty({ example: 'uuid-size', required: false })
-  sizeId?: string;
+  sizeId?: string | null;
 
   @IsString()
   @ApiProperty({ example: 'uuid-color', required: false })
