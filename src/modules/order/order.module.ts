@@ -6,6 +6,7 @@ import { Address } from '../../shared/schemas/entities/address.entity';
 import { Payment } from '../../shared/schemas/entities/payment.entity';
 import { QueueModule } from '../queue/queue.module';
 import { MailerModule } from '@nestjs-modules/mailer';
+import { CouponModule } from '../coupon/coupon.module';
 
 @Module({
 
@@ -18,6 +19,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
     ]),
     QueueModule,
     MailerModule, // Import MailerModule để có thể gửi email trực tiếp khi queue fail
+    CouponModule, // Import CouponModule để sử dụng CouponService
   ],
   exports: [TypeOrmModule,]
 })

@@ -26,6 +26,13 @@ export class FlashSaleController {
     return this.flashSaleService.create(dto);
   }
 
+  @Get('active')
+  @ApiOperation({ summary: 'Get active flash sales' })
+  @ApiResponse({ status: 200, description: 'Active flash sales returned successfully.' })
+  findActive() {
+    return this.flashSaleService.findActive();
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get list of flash sales with pagination' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number', type: Number })

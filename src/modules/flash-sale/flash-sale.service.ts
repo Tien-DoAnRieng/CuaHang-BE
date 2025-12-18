@@ -83,6 +83,22 @@ export class FlashSaleService {
     await this.flashSaleItemRepo.save(items);
     return saved;
   }
+  async findActive() {
+    const now = new Date();
+    return this.flashSaleRepo
+      .createQueryBuilder('flashSale')
+      .leftJoinAndSelect('flashSale.items', 'items')
+      .leftJoinAndSelect('items.productVariant', 'productVariant')
+      .leftJoinAndSelect('productVariant.product', 'product')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('productVariant.color', 'color')
+      .leftJoinAndSelect('productVariant.size', 'size')
+      .where('flashSale.isActive = :isActive', { isActive: true })
+      .andWhere('flashSale.startTime <= :now', { now })
+      .andWhere('flashSale.endTime >= :now', { now })
+      .getMany();
+  }
+
   async findAll(page: number, limit: number) {
     return this.flashSaleRepo.find({
       relations: ['items'],

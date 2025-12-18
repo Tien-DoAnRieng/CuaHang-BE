@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { RoleEnum } from '../../../common/enums/role.enum';
+import { OrderStatus } from '../../../common/enums/order-status.enum';
 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -129,16 +130,30 @@ export class PaymentController {
   @Post('momo/notify')
   @ApiOperation({ summary: 'MoMo IPN notify' })
   async momoNotify(@Body() payload: any, @Query('skipVerify') skipVerify?: string) {
+    this.logger.log('MoMo IPN received:', payload);
     const res = await this.momoService.handleMomoNotify(payload, skipVerify === 'true');
+    this.logger.log('MoMo IPN result:', res);
     return res.success ? { result: 'OK' } : { result: 'FAIL' };
   }
 
   @Public()
   @Get('success')
-  @ApiOperation({ summary: 'Momo return URL' })
-  async momoReturn(@Query() query: any) {
-    await this.momoService.handleMomoNotify(query);
-    return { message: 'Momo return processed', query };
+  @ApiOperation({ summary: 'Momo return URL - redirect to frontend' })
+  async momoReturn(@Query() query: any, @Req() req: any) {
+    this.logger.log('MoMo return callback received:', query);
+    
+    // Xử lý notify và cập nhật order status
+    const result = await this.momoService.handleMomoNotify(query, true);
+    this.logger.log('MoMo return notify result:', result);
+    
+    // Redirect sang frontend callback
+    const frontendUrl = 'http://localhost:5173/payment/momo/callback';
+    const queryString = new URLSearchParams(query as any).toString();
+    const redirectUrl = `${frontendUrl}?${queryString}`;
+    
+    this.logger.log('Redirecting to:', redirectUrl);
+    // Redirect response
+    return req.res.redirect(redirectUrl);
   }
 
   // ---------------------------------------------
@@ -182,16 +197,29 @@ async createVnpay(@Query('orderId') orderId: string, @Req() req: any) {
 @Public()
 @Get('vnpay/return')
 @ApiOperation({ summary: 'VNPAY return URL (redirect)' })
-async handleReturn(@Query() query: any) {
+async handleReturn(@Query() query: any, @Req() req: any) {
   try {
+    this.logger.log('VNPAY return callback received:', query);
     const payment = await this.vnpayService.handleReturn(query);
+    this.logger.log('VNPAY payment result:', payment);
 
     // Cập nhật trạng thái đơn hàng nếu thanh toán thành công
     if (payment.responseCode === '00') {
       const order = await this.orderRepository.findOne({ where: { id: payment.orderId } });
+      this.logger.log(`Found order ${payment.orderId}:`, order);
       if (order) {
-        order.status = 'PAID';
-        await this.orderRepository.save(order);
+        this.logger.log(`Updating order ${order.id} status: ${order.status} -> ${OrderStatus.PAID}`);
+        
+        // Use update() method to directly execute UPDATE query
+        await this.orderRepository.update(
+          { id: order.id },
+          { status: OrderStatus.PAID }
+        );
+        this.logger.log(`Order ${order.id} updated successfully using update() method`);
+        
+        // Verify update
+        const verifyOrder = await this.orderRepository.findOne({ where: { id: payment.orderId } });
+        this.logger.log(`Verified order status after update: ${verifyOrder?.status}`);
       }
 
       const payRecord = await this.paymentRepository.findOne({ where: { order: { id: payment.orderId } } });
@@ -201,9 +229,19 @@ async handleReturn(@Query() query: any) {
       }
     }
 
-    return { status: true, message: 'Thanh toán thành công', data: payment };
+    // Redirect về frontend callback
+    const frontendUrl = payment.responseCode === '00' 
+      ? 'http://localhost:5173/payment/vnpay/callback'
+      : 'http://localhost:5173/payment/failed';
+    const queryString = new URLSearchParams(query as any).toString();
+    const redirectUrl = `${frontendUrl}?${queryString}`;
+    
+    this.logger.log('VNPAY redirecting to:', redirectUrl);
+    return req.res.redirect(redirectUrl);
   } catch (err: any) {
-    return { status: false, message: err.message, data: query };
+    this.logger.error('VNPAY return error:', err);
+    // Redirect về failed page nếu có lỗi
+    return req.res.redirect(`http://localhost:5173/payment/failed?error=${encodeURIComponent(err.message)}`);
   }
 }
 @Public()
@@ -236,16 +274,20 @@ async handleIpn(@Req() req: any, @Body() body: any) {
 
     // Nếu thanh toán thành công
     if (responseCode === '00') {
-      order.status = 'PAID';
-      await this.orderRepository.save(order);
+      this.logger.log(`VNPAY IPN: Updating order ${orderId} status to PAID`);
+      
+      // Use update() method to directly execute UPDATE query
+      await this.orderRepository.update(
+        { id: orderId },
+        { status: OrderStatus.PAID }
+      );
+      this.logger.log(`VNPAY IPN: Order ${orderId} updated successfully`);
 
-      const payRecord = await this.paymentRepository.findOne({
-        where: { order: { id: orderId } },
-      });
-      if (payRecord) {
-        payRecord.status = 'SUCCESS';
-        await this.paymentRepository.save(payRecord);
-      }
+      // Update payment record
+      await this.paymentRepository.update(
+        { order: { id: orderId } },
+        { status: 'SUCCESS' }
+      );
     }
 
     // Trả về VNPAY RspCode 00 để VNPAY biết đã nhận thành công
@@ -256,8 +298,4 @@ async handleIpn(@Req() req: any, @Body() body: any) {
     return { RspCode: '97', Message: 'Invalid signature' };
   }
 }
-
-
-
-
 }

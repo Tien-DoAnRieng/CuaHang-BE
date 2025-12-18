@@ -27,4 +27,9 @@ export class CreateOrderDto {
   @IsString()
   @ApiProperty({ example: 'PENDING', required: false })
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ example: 'SALE', required: false })
+  couponCode?: string;
 }

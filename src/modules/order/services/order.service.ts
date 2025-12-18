@@ -13,6 +13,8 @@ import { Product } from '../../../shared/schemas/entities/product.entity';
 import { Address } from '../../../shared/schemas/entities/address.entity';
 import { QueueService } from '../../queue/queue.service';
 import { MailerService } from '@nestjs-modules/mailer';
+import { CouponService } from '../../coupon/coupon.service';
+import { CartService } from '../../cart/cart.service';
 
 @Injectable()
 export class OrderService {
@@ -35,6 +37,8 @@ export class OrderService {
     private readonly addressRepository: Repository<Address>,
     private readonly queueService: QueueService,
     private readonly mailerService: MailerService,
+    private readonly couponService: CouponService,
+    private readonly cartService: CartService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -57,9 +61,38 @@ export class OrderService {
       if (v.stockQuantity < it.quantity) throw new BadRequestException(`Insufficient stock for variant ${it.variantId}`);
       computedTotal += priceNum * Number(it.quantity);
     }
+
+    // Xử lý coupon discount nếu có
+    let discount = 0;
+    if (dto.couponCode) {
+      try {
+        const coupon = await this.couponService.validateCoupon(dto.couponCode, userId, computedTotal);
+        
+        // Tính discount dựa trên loại coupon
+        if (coupon.discountType === 'PERCENT') {
+          discount = (computedTotal * coupon.discountValue) / 100;
+          // Apply max discount limit if exists
+          if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
+            discount = coupon.maxDiscountAmount;
+          }
+        } else {
+          // FIXED discount
+          discount = coupon.discountValue;
+        }
+        
+        // Discount cannot exceed order amount
+        discount = Math.min(discount, computedTotal);
+      } catch (error) {
+        this.logger.warn(`Invalid coupon code: ${dto.couponCode}`, error.message);
+        // Continue without discount if coupon is invalid
+      }
+    }
+
+    const expectedTotal = computedTotal - discount;
     const providedCents = Math.round(Number(dto.totalAmount) * 100);
-    const computedCents = Math.round(computedTotal * 100);
-    if (providedCents !== computedCents) {
+    const expectedCents = Math.round(expectedTotal * 100);
+    
+    if (providedCents !== expectedCents) {
       const breakdown = dto.items.map(it => {
         const v = variantMap.get(it.variantId);
         const rawPrice = v ? (v.priceOverride ?? v.product?.price) : null;
@@ -77,7 +110,10 @@ export class OrderService {
         provided: Number(dto.totalAmount),
         providedCents,
         computed: computedTotal,
-        computedCents,
+        discount,
+        expectedTotal,
+        expectedCents,
+        couponCode: dto.couponCode,
         breakdown,
       });
 
@@ -90,7 +126,7 @@ export class OrderService {
 
       const orderEntity = orderRepo.create({
         userId,
-        totalAmount: computedTotal,
+        totalAmount: expectedTotal, // Lưu tổng sau khi trừ discount
         status: OrderStatus.PENDING,
         paymentMethod: dto.paymentMethod,
         shippingAddressId: dto.shippingAddressId,
@@ -118,6 +154,17 @@ export class OrderService {
       await itemRepo.save(itemsToSave as OrderItem[]);
       return savedOrder;
     });
+
+    // Xóa chỉ các sản phẩm đã đặt hàng khỏi giỏ hàng (không xóa toàn bộ)
+    try {
+      for (const item of dto.items) {
+        await this.cartService.removeItem(userId, item.variantId);
+      }
+      this.logger.log(`Removed ${dto.items.length} items from cart for user ${userId} after successful order`);
+    } catch (error) {
+      this.logger.warn(`Failed to remove items from cart for user ${userId}:`, error.message);
+      // Không throw error vì order đã tạo thành công
+    }
 
     const orderWithItems = await this.orderRepository.findOne({ where: { id: saved.id }, relations: ['items', 'payments', 'shippingAddress'] });
     if (!orderWithItems) throw new Error('Order not found after save');
@@ -166,6 +213,7 @@ export class OrderService {
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
+      relations: ['shippingAddress', 'items', 'items.variant', 'items.variant.product', 'items.variant.product.images', 'items.variant.color', 'items.variant.size'],
     });
     return { data, total, page, limit };
   }
@@ -184,7 +232,7 @@ export class OrderService {
     if (!order) return null;
     const allowed: Record<string, string[]> = {
       [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.PAID],
-      [OrderStatus.PROCESSING]: [OrderStatus.PAID, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.CANCELLED],
       [OrderStatus.PAID]: [OrderStatus.SHIPPED, OrderStatus.REFUNDED],
       [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
       [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED],

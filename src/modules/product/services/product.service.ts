@@ -171,7 +171,16 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
 
   if (status) qb.andWhere('product.status = :status', { status });
 
-  if (category) qb.andWhere('LOWER(category.name) = :category', { category: category.toLowerCase() });
+  // Hỗ trợ filter theo cả ID hoặc name của category
+  if (category) {
+    // Nếu category là UUID (có dấu gạch ngang), filter theo ID
+    if (category.includes('-')) {
+      qb.andWhere('category.id = :category', { category });
+    } else {
+      // Ngược lại filter theo name
+      qb.andWhere('LOWER(category.name) = :category', { category: category.toLowerCase() });
+    }
+  }
 
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;

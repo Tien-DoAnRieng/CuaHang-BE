@@ -29,6 +29,7 @@ import { ColorSizeModule } from './modules/color-size/color-size.module';
 import { BrandModule } from './modules/brand/brand.module';
 import { MemberTypeModule } from './modules/member-type/member-type.module';
 import { CouponModule } from './modules/coupon/coupon.module';
+import { ChatModule } from './modules/chat/chat.module';
 @Module({
   imports: [
 
@@ -57,7 +58,8 @@ import { CouponModule } from './modules/coupon/coupon.module';
   FlashSaleModule,
   ColorSizeModule,
   MemberTypeModule,
-  CouponModule
+  CouponModule,
+  ChatModule
   ],
   controllers: [AppController],
   providers: [AppService],

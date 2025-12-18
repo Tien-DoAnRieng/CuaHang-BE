@@ -11,6 +11,6 @@ import { CartController } from './cart.controller';
   imports: [TypeOrmModule.forFeature([Cart, CartItem, ProductVariant, Product])],
   providers: [CartService],
   controllers: [CartController],
-  
+  exports: [CartService], // Export để các module khác có thể sử dụng
 })
 export class CartModule {}
