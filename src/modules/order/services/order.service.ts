@@ -196,7 +196,53 @@ export class OrderService {
 
     return this.orderRepository.findOne({ where: { id }, relations: ['items'] }) as Promise<Order>;
   }
-  async findAll({ search, page = 1, limit = 10 }: { search?: string; page?: number; limit?: number }) {
+  async findAll({ 
+    search, 
+    page = 1, 
+    limit = 10, 
+    sellerId 
+  }: { 
+    search?: string; 
+    page?: number; 
+    limit?: number; 
+    sellerId?: string;
+  }) {
+    // Nếu có sellerId, chỉ lấy đơn hàng chứa sản phẩm của seller đó
+    if (sellerId) {
+      // Bước 1: Tìm các order IDs có chứa sản phẩm của seller
+      const orderIdsResult = await this.orderRepository
+        .createQueryBuilder('order')
+        .leftJoin('order.items', 'items')
+        .leftJoin('items.variant', 'variant')
+        .leftJoin('variant.product', 'product')
+        .where('product.sellerId = :sellerId', { sellerId })
+        .select('DISTINCT order.id', 'id')
+        .getRawMany();
+      
+      const orderIds = orderIdsResult.map((row: any) => row.id).filter((id: any) => id != null);
+      
+      if (orderIds.length === 0) {
+        return { data: [], total: 0, page, limit };
+      }
+      
+      // Bước 2: Query orders với các IDs đã tìm được
+      const whereConditions: any[] = [{ id: In(orderIds) }];
+      if (search) {
+        whereConditions.push({ status: Like(`%${search}%`) });
+      }
+      
+      const [data, total] = await this.orderRepository.findAndCount({
+        where: whereConditions.length > 1 ? whereConditions : whereConditions[0],
+        skip: (page - 1) * limit,
+        take: limit,
+        order: { createdAt: 'DESC' },
+        relations: ['user', 'shippingAddress', 'items', 'items.variant', 'items.variant.product'],
+      });
+      
+      return { data, total, page, limit };
+    }
+    
+    // Admin: lấy tất cả đơn hàng
     const where = search ? [{ status: Like(`%${search}%`) }] : {};
     const [data, total] = await this.orderRepository.findAndCount({
       where,

@@ -6,9 +6,10 @@ import { ReviewController } from './controllers/review.controller';
 import { Order } from '../../shared/schemas/entities/order.entity';
 import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
 import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
+import { Product } from '../../shared/schemas/entities/product.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Review, Order, OrderItem, ProductVariant])],
+  imports: [TypeOrmModule.forFeature([Review, Order, OrderItem, ProductVariant, Product])],
   controllers: [ReviewController],
   providers: [ReviewService],
   exports: [ReviewService],

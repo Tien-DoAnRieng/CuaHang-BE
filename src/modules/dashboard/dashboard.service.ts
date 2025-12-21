@@ -25,15 +25,55 @@ export class DashboardService {
     @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
     @InjectRepository(Product) private productRepo: Repository<Product>,
   ) {}
-  async getOverview(): Promise<OverviewDto> {
+  // Helper: Lấy order IDs có chứa sản phẩm của seller
+  private async getOrderIdsBySeller(sellerId: string): Promise<string[]> {
+    console.log('[DashboardService.getOrderIdsBySeller] Looking for orders with sellerId:', sellerId);
+    
+    // First, check if seller has any products
+    const sellerProducts = await this.productRepo.find({
+      where: { sellerId },
+      select: ['id', 'name', 'sellerId']
+    });
+    console.log('[DashboardService.getOrderIdsBySeller] Seller products count:', sellerProducts.length);
+    if (sellerProducts.length === 0) {
+      console.log('[DashboardService.getOrderIdsBySeller] Seller has no products, returning empty array');
+      return [];
+    }
+    
+    const result = await this.orderRepo
+      .createQueryBuilder('order')
+      .leftJoin('order.items', 'items')
+      .leftJoin('items.variant', 'variant')
+      .leftJoin('variant.product', 'product')
+      .where('product.sellerId = :sellerId', { sellerId })
+      .select('DISTINCT order.id', 'id')
+      .getRawMany();
+    
+    const orderIds = result.map((r: any) => r.id).filter((id: any) => id != null);
+    console.log('[DashboardService.getOrderIdsBySeller] Found orderIds:', orderIds.length, orderIds);
+    return orderIds;
+  }
+
+  async getOverview(sellerId?: string): Promise<OverviewDto> {
+    console.log('[DashboardService.getOverview] Called with sellerId:', sellerId);
+    
     const currentMonth = new Date().getMonth() + 1;
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
 
-    const currentRevenue = await this.getMonthlyRevenueValue(currentMonth);
-    const lastRevenue = await this.getMonthlyRevenueValue(lastMonth);
+    const currentRevenue = await this.getMonthlyRevenueValue(currentMonth, sellerId);
+    const lastRevenue = await this.getMonthlyRevenueValue(lastMonth, sellerId);
 
-    const totalOrders = await this.orderRepo.count();
-    const totalCustomers = await this.userRepo.count();
+    let totalOrders: number;
+    if (sellerId) {
+      const orderIds = await this.getOrderIdsBySeller(sellerId);
+      console.log('[DashboardService.getOverview] Seller orderIds:', orderIds.length, orderIds);
+      totalOrders = orderIds.length;
+    } else {
+      totalOrders = await this.orderRepo.count();
+    }
+
+    // totalCustomers không áp dụng cho seller
+    const totalCustomers = sellerId ? 0 : await this.userRepo.count();
 
     const revenueGrowth =
       lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
@@ -49,8 +89,25 @@ export class DashboardService {
     };
   }
 
-  private async getMonthlyRevenueValue(month: number): Promise<number> {
+  private async getMonthlyRevenueValue(month: number, sellerId?: string): Promise<number> {
     const year = new Date().getFullYear();
+    
+    if (sellerId) {
+      // Nếu có sellerId, lấy order IDs trước rồi tính revenue
+      const orderIds = await this.getOrderIdsBySeller(sellerId);
+      if (orderIds.length === 0) return 0;
+      
+      const result = await this.orderRepo
+        .createQueryBuilder('order')
+        .select('SUM(order.totalAmount)', 'total')
+        .where('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+        .andWhere('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+        .andWhere('order.id IN (:...orderIds)', { orderIds })
+        .getRawOne();
+      return Number(result?.total || 0);
+    }
+    
+    // Admin: lấy tất cả
     const result = await this.orderRepo
       .createQueryBuilder('order')
       .select('SUM(order.totalAmount)', 'total')
@@ -59,12 +116,18 @@ export class DashboardService {
       .getRawOne();
     return Number(result?.total || 0);
   }
-  async getRevenueByCategory(): Promise<CategoryRevenueDto[]> {
-    const result = await this.orderItemRepo
+  async getRevenueByCategory(sellerId?: string): Promise<CategoryRevenueDto[]> {
+    let qb = this.orderItemRepo
       .createQueryBuilder('item')
       .leftJoin('item.variant', 'variant')
       .leftJoin('variant.product', 'product')
-      .leftJoin('product.category', 'category')
+      .leftJoin('product.category', 'category');
+    
+    if (sellerId) {
+      qb = qb.where('product.sellerId = :sellerId', { sellerId });
+    }
+    
+    const result = await qb
       .select('category.name', 'category')
       .addSelect('SUM(item.priceAtTime * item.quantity)', 'amount')
       .groupBy('category.name')
@@ -125,10 +188,18 @@ export class DashboardService {
       };
     });
   }
-  async getRecentOrders() {
-    return this.orderRepo
+  async getRecentOrders(sellerId?: string) {
+    let qb = this.orderRepo
       .createQueryBuilder('order')
-      .leftJoinAndSelect('order.user', 'user')
+      .leftJoinAndSelect('order.user', 'user');
+    
+    if (sellerId) {
+      const orderIds = await this.getOrderIdsBySeller(sellerId);
+      if (orderIds.length === 0) return [];
+      qb = qb.where('order.id IN (:...orderIds)', { orderIds });
+    }
+    
+    return qb
       .orderBy('order.createdAt', 'DESC')
       .limit(5)
       .getMany();
@@ -239,13 +310,25 @@ async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<B
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }
-async getDailyRevenue(year: number, month: number): Promise<MonthlyRevenueDto[]> {
-  const result = await this.orderRepo
+async getDailyRevenue(year: number, month: number, sellerId?: string): Promise<MonthlyRevenueDto[]> {
+  let qb = this.orderRepo
     .createQueryBuilder('order')
     .select('EXTRACT(DAY FROM order.createdAt)', 'day')
     .addSelect('SUM(order.totalAmount)', 'total')
     .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
-    .andWhere('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+    .andWhere('EXTRACT(MONTH FROM order.createdAt) = :month', { month });
+  
+  if (sellerId) {
+    const orderIds = await this.getOrderIdsBySeller(sellerId);
+    if (orderIds.length === 0) {
+      // Trả về array rỗng với tất cả các ngày = 0
+      const daysInMonth = new Date(year, month, 0).getDate();
+      return Array.from({ length: daysInMonth }, (_, i) => ({ month: i + 1, actual: 0, target: 0 }));
+    }
+    qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
+  }
+  
+  const result = await qb
     .groupBy('day')
     .orderBy('day', 'ASC')
     .getRawMany();
@@ -259,15 +342,26 @@ async getDailyRevenue(year: number, month: number): Promise<MonthlyRevenueDto[]>
   }
   return data;
 }
-async getYearlyRevenue(): Promise<MonthlyRevenueDto[]> {
+async getYearlyRevenue(sellerId?: string): Promise<MonthlyRevenueDto[]> {
   const currentYear = new Date().getFullYear();
   const startYear = currentYear - 4; // ví dụ 5 năm gần đây
 
-  const result = await this.orderRepo
+  let qb = this.orderRepo
     .createQueryBuilder('order')
     .select('EXTRACT(YEAR FROM order.createdAt)', 'year')
     .addSelect('SUM(order.totalAmount)', 'total')
-    .where('EXTRACT(YEAR FROM order.createdAt) >= :startYear', { startYear })
+    .where('EXTRACT(YEAR FROM order.createdAt) >= :startYear', { startYear });
+  
+  if (sellerId) {
+    const orderIds = await this.getOrderIdsBySeller(sellerId);
+    if (orderIds.length === 0) {
+      // Trả về array với tất cả các năm = 0
+      return Array.from({ length: 5 }, (_, i) => ({ month: startYear + i, actual: 0, target: 0 }));
+    }
+    qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
+  }
+  
+  const result = await qb
     .groupBy('year')
     .orderBy('year', 'ASC')
     .getRawMany();
@@ -280,13 +374,24 @@ async getYearlyRevenue(): Promise<MonthlyRevenueDto[]> {
   }
   return data;
 }
-async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
+async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenueDto[]> {
   const y = year || new Date().getFullYear();
-  const result = await this.orderRepo
+  let qb = this.orderRepo
     .createQueryBuilder('order')
     .select('EXTRACT(MONTH FROM order.createdAt)', 'month')
     .addSelect('SUM(order.totalAmount)', 'actual')
-    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year: y })
+    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year: y });
+  
+  if (sellerId) {
+    const orderIds = await this.getOrderIdsBySeller(sellerId);
+    if (orderIds.length === 0) {
+      // Trả về array với tất cả các tháng = 0
+      return Array.from({ length: 12 }, (_, i) => ({ month: i + 1, actual: 0, target: 0 }));
+    }
+    qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
+  }
+  
+  const result = await qb
     .groupBy('month')
     .orderBy('month', 'ASC')
     .getRawMany();
@@ -301,26 +406,40 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
 }
 
   // Doanh thu theo phương thức thanh toán
-  async getRevenueByPaymentMethod(): Promise<{ method: string; amount: number; percentage: number }[]> {
+  async getRevenueByPaymentMethod(sellerId?: string): Promise<{ method: string; amount: number; percentage: number }[]> {
+    let orderIds: string[] | undefined;
+    if (sellerId) {
+      orderIds = await this.getOrderIdsBySeller(sellerId);
+      if (orderIds.length === 0) return [];
+    }
+    
     // Thử query từ payment trước
-    let result = await this.paymentRepo
+    let qb = this.paymentRepo
       .createQueryBuilder('payment')
       .leftJoin('payment.order', 'order')
       .select('payment.paymentMethod', 'method')
       .addSelect('SUM(order.totalAmount)', 'amount')
-      .where('payment.status = :status', { status: 'SUCCESS' })
-      .groupBy('payment.paymentMethod')
-      .getRawMany();
+      .where('payment.status = :status', { status: 'SUCCESS' });
+    
+    if (orderIds) {
+      qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
+    }
+    
+    let result = await qb.groupBy('payment.paymentMethod').getRawMany();
 
     // Nếu không có dữ liệu từ payment, lấy từ orders
     if (!result || result.length === 0) {
-      result = await this.orderRepo
+      let orderQb = this.orderRepo
         .createQueryBuilder('order')
         .select('order.paymentMethod', 'method')
         .addSelect('SUM(order.totalAmount)', 'amount')
-        .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
-        .groupBy('order.paymentMethod')
-        .getRawMany();
+        .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+      
+      if (orderIds) {
+        orderQb = orderQb.andWhere('order.id IN (:...orderIds)', { orderIds });
+      }
+      
+      result = await orderQb.groupBy('order.paymentMethod').getRawMany();
     }
 
     const total = result.reduce((acc, r) => acc + Number(r.amount || 0), 0);
@@ -332,14 +451,20 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
   }
 
   // Phân bổ thanh toán hôm nay
-  async getTodayPaymentDistribution(): Promise<{ method: string; amount: number; count: number }[]> {
+  async getTodayPaymentDistribution(sellerId?: string): Promise<{ method: string; amount: number; count: number }[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    let orderIds: string[] | undefined;
+    if (sellerId) {
+      orderIds = await this.getOrderIdsBySeller(sellerId);
+      if (orderIds.length === 0) return [];
+    }
+
     // Thử query từ payment trước
-    let result = await this.paymentRepo
+    let qb = this.paymentRepo
       .createQueryBuilder('payment')
       .leftJoin('payment.order', 'order')
       .select('payment.paymentMethod', 'method')
@@ -347,22 +472,30 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
       .addSelect('COUNT(payment.id)', 'count')
       .where('payment.paymentTime >= :start', { start: today })
       .andWhere('payment.paymentTime < :end', { end: tomorrow })
-      .andWhere('payment.status = :status', { status: 'SUCCESS' })
-      .groupBy('payment.paymentMethod')
-      .getRawMany();
+      .andWhere('payment.status = :status', { status: 'SUCCESS' });
+    
+    if (orderIds) {
+      qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
+    }
+    
+    let result = await qb.groupBy('payment.paymentMethod').getRawMany();
 
     // Nếu không có dữ liệu từ payment, lấy từ orders
     if (!result || result.length === 0) {
-      result = await this.orderRepo
+      let orderQb = this.orderRepo
         .createQueryBuilder('order')
         .select('order.paymentMethod', 'method')
         .addSelect('SUM(order.totalAmount)', 'amount')
         .addSelect('COUNT(order.id)', 'count')
         .where('order.createdAt >= :start', { start: today })
         .andWhere('order.createdAt < :end', { end: tomorrow })
-        .andWhere('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
-        .groupBy('order.paymentMethod')
-        .getRawMany();
+        .andWhere('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+      
+      if (orderIds) {
+        orderQb = orderQb.andWhere('order.id IN (:...orderIds)', { orderIds });
+      }
+      
+      result = await orderQb.groupBy('order.paymentMethod').getRawMany();
     }
 
     return result.map((r) => ({
@@ -373,8 +506,8 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
   }
 
   // Sản phẩm bán chạy
-  async getTopProducts(limit: number = 10): Promise<{ id: string; name: string; sold: number; revenue: number }[]> {
-    const result = await this.orderItemRepo
+  async getTopProducts(limit: number = 10, sellerId?: string): Promise<{ id: string; name: string; sold: number; revenue: number }[]> {
+    let qb = this.orderItemRepo
       .createQueryBuilder('item')
       .leftJoin('item.variant', 'variant')
       .leftJoin('variant.product', 'product')
@@ -383,7 +516,13 @@ async getMonthlyRevenue(year?: number): Promise<MonthlyRevenueDto[]> {
       .addSelect('product.name', 'name')
       .addSelect('SUM(item.quantity)', 'sold')
       .addSelect('SUM(item.priceAtTime * item.quantity)', 'revenue')
-      .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] })
+      .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+    
+    if (sellerId) {
+      qb = qb.andWhere('product.sellerId = :sellerId', { sellerId });
+    }
+    
+    const result = await qb
       .groupBy('product.id')
       .addGroupBy('product.name')
       .orderBy('sold', 'DESC')

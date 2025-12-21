@@ -20,7 +20,7 @@ export class ProductService {
   ) {}
 
   /** Tạo sản phẩm */
-  async create(dto: CreateProductDto): Promise<Product> {
+  async create(dto: CreateProductDto, sellerId?: string): Promise<Product> {
     let categoryEntity: Category | undefined;
     let brandEntity: Brand | undefined;
 
@@ -47,9 +47,10 @@ export class ProductService {
       categoryId: categoryEntity?.id,
       brandId: brandEntity?.id,
       image: dto.imageUrl || '', // Lưu imageUrl vào field image
+      sellerId: sellerId || undefined, // Lưu sellerId nếu có (dùng undefined thay vì null)
     });
 
-    const savedProduct = await this.productRepository.save(product);
+    const savedProduct = await this.productRepository.save(product) as Product;
 
     // Tạo variant nếu có
     if (dto.hasVariants && dto.variants?.length) {
@@ -156,7 +157,10 @@ export class ProductService {
   }
 
 async findAll(query: any): Promise<{ data: Product[]; total: number; page: number; limit: number }> {
-  const { q, brand, category, status, page = 1, limit = 20 } = query;
+  const { q, brand, category, status, sellerId, page = 1, limit = 20 } = query;
+
+  // Debug logging
+  console.log('[ProductService.findAll] Query params:', { q, brand, category, status, sellerId, page, limit });
 
   const qb = this.productRepository.createQueryBuilder('product')
     .leftJoinAndSelect('product.category', 'category')
@@ -166,7 +170,8 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
     .leftJoinAndSelect('variants.size', 'size')      
     .leftJoinAndSelect('product.flashSales', 'flashSales')
     .leftJoinAndSelect('flashSales.items', 'flashSaleItems')
-    .leftJoinAndSelect('product.images', 'images');
+    .leftJoinAndSelect('product.images', 'images')
+    .leftJoinAndSelect('product.seller', 'seller');
 
   if (q)
     qb.andWhere('(LOWER(product.name) LIKE :q OR LOWER(product.description) LIKE :q)', { q: `%${q.toLowerCase()}%` });
@@ -174,6 +179,14 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
   if (brand) qb.andWhere('product.brand = :brand', { brand });
 
   if (status) qb.andWhere('product.status = :status', { status });
+
+  // Filter theo sellerId nếu có
+  if (sellerId) {
+    console.log('[ProductService.findAll] Filtering by sellerId:', sellerId);
+    qb.andWhere('product.sellerId = :sellerId', { sellerId });
+  } else {
+    console.log('[ProductService.findAll] No sellerId filter - returning all products');
+  }
 
   // Hỗ trợ filter theo cả ID hoặc name của category
   if (category) {
@@ -190,7 +203,37 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
   const limitNum = Number(limit) || 20;
   const skip = (pageNum - 1) * limitNum;
 
+  // Log SQL query trước khi execute
+  const sql = qb.getSql();
+  const params = qb.getParameters();
+  console.log('[ProductService.findAll] SQL Query:', sql);
+  console.log('[ProductService.findAll] Query Parameters:', params);
+
   const [data, total] = await qb.skip(skip).take(limitNum).getManyAndCount();
+
+  console.log('[ProductService.findAll] Result:', { 
+    dataCount: data.length, 
+    total, 
+    page: pageNum, 
+    limit: limitNum,
+    sellerIds: data.map(p => p.sellerId).filter(Boolean),
+    firstProductSellerId: data[0]?.sellerId || null
+  });
+
+  // Nếu có sellerId filter nhưng không có kết quả, log thêm thông tin
+  if (sellerId && data.length === 0) {
+    console.warn('[ProductService.findAll] ⚠️ WARNING: sellerId filter applied but no products found!');
+    console.warn('[ProductService.findAll] sellerId:', sellerId);
+    // Kiểm tra xem có sản phẩm nào với sellerId này không
+    const checkProducts = await this.productRepository.find({
+      where: { sellerId },
+      select: ['id', 'name', 'sellerId']
+    });
+    console.warn('[ProductService.findAll] Products in DB with this sellerId:', checkProducts.length);
+    if (checkProducts.length > 0) {
+      console.warn('[ProductService.findAll] Sample product IDs:', checkProducts.slice(0, 3).map(p => p.id));
+    }
+  }
 
   return { data, total, page: pageNum, limit: limitNum };
 }

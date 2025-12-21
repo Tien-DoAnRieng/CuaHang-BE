@@ -41,50 +41,50 @@ export class ChatController {
     return this.chatService.getChatHistory(req.user.id);
   }
 
-  // Admin: Reply tin nhắn
+  // Admin/Seller: Reply tin nhắn
   @Post('admin/reply')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin phản hồi tin nhắn' })
+  @ApiOperation({ summary: 'Admin/Seller phản hồi tin nhắn' })
   async adminReply(@Body() dto: AdminReplyDto) {
     return this.chatService.adminReply(dto.userId, dto.message);
   }
 
-  // Admin: Lấy danh sách conversations
+  // Admin/Seller: Lấy danh sách conversations
   @Get('admin/conversations')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin lấy danh sách cuộc trò chuyện' })
+  @ApiOperation({ summary: 'Admin/Seller lấy danh sách cuộc trò chuyện' })
   async getConversations() {
     return this.chatService.getAllConversations();
   }
 
-  // Admin: Lấy lịch sử chat với 1 user cụ thể
+  // Admin/Seller: Lấy lịch sử chat với 1 user cụ thể
   @Get('admin/history/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin lấy lịch sử chat với user' })
+  @ApiOperation({ summary: 'Admin/Seller lấy lịch sử chat với user' })
   async getAdminHistory(@Param('userId') userId: string) {
     return this.chatService.getChatHistory(userId);
   }
 
-  // Admin: Đánh dấu đã đọc
+  // Admin/Seller: Đánh dấu đã đọc
   @Post('admin/mark-read/:userId')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Đánh dấu tin nhắn đã đọc' })
   async markAsRead(@Param('userId') userId: string) {
     return this.chatService.markAsRead(userId);
   }
 
-  // Admin: Số tin nhắn chưa đọc
+  // Admin/Seller: Số tin nhắn chưa đọc
   @Get('admin/unread-count')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy số tin nhắn chưa đọc' })
   async getUnreadCount() {

@@ -11,6 +11,9 @@ import { ProductImage } from '../../shared/schemas/entities/product-image.entity
 import { FlashSaleItem } from '../../shared/schemas/entities/flash-sale-item.entity';
 import { FlashSale } from '../../shared/schemas/entities/flash-sale.entity';
 import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
+import { Order } from '../../shared/schemas/entities/order.entity';
+import { Review } from '../../shared/schemas/entities/review.entity';
+import { User } from '../../shared/schemas/entities/user.entity';
 
 import { ProductVariantModule } from '../product-variant/product-variant.module';
 import { ProductImageModule } from '../product-image/product-image.module';
@@ -40,6 +43,9 @@ import { ProductVariantService } from '../product-variant/services/product-varia
       FlashSale,
       FlashSaleItem,
       OrderItem,
+      Order,
+      Review,
+      User,
     ]),
     FlashSaleModule,
     ProductVariantModule,

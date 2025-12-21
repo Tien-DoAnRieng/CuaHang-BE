@@ -6,6 +6,7 @@ import { ProductVariant } from './product-variant.entity';
 import { ProductImage } from './product-image.entity';
 import { FlashSale } from './flash-sale.entity';
 import { FlashSaleItem } from './flash-sale-item.entity';
+import { User } from './user.entity';
 
 @Entity('products')
 export class Product extends BaseEntity {
@@ -35,6 +36,13 @@ export class Product extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   image: string; // Thêm field image để lưu URL ảnh chính
+
+  @Column({ name: 'seller_id', nullable: true })
+  sellerId: string; // ID của seller sở hữu sản phẩm
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'seller_id' })
+  seller: User; // Quan hệ với User (seller)
 
   @OneToMany(() => FlashSale, flashSale => flashSale.product)
 flashSales: FlashSale[];

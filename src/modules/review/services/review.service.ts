@@ -123,13 +123,22 @@ export class ReviewService {
     };
   }
 
-  async findAllAdmin(filters: { productId?: string; userId?: string; status?: string }, page = 1, limit = 20) {
-    const qb = this.reviewRepo.createQueryBuilder('r').leftJoinAndSelect('r.user', 'user').leftJoinAndSelect('r.product', 'product');
+  async findAllAdmin(filters: { productId?: string; userId?: string; status?: string; sellerId?: string }, page = 1, limit = 20) {
+    const qb = this.reviewRepo.createQueryBuilder('r')
+      .leftJoinAndSelect('r.user', 'user')
+      .leftJoinAndSelect('r.product', 'product')
+      .leftJoinAndSelect('product.seller', 'seller');
+    
     if (filters.productId) qb.andWhere('r.productId = :productId', { productId: filters.productId });
     if (filters.userId) qb.andWhere('r.userId = :userId', { userId: filters.userId });
     if (filters.status && filters.status !== 'all') {
       qb.andWhere('r.status = :status', { status: filters.status });
     }
+    // Filter theo sellerId nếu có (seller chỉ xem đánh giá của sản phẩm họ sở hữu)
+    if (filters.sellerId) {
+      qb.andWhere('product.sellerId = :sellerId', { sellerId: filters.sellerId });
+    }
+    
     const total = await qb.getCount();
     const data = await qb.orderBy('r.createdAt', 'DESC').skip((page - 1) * limit).take(limit).getMany();
     return { data, total, page, limit };

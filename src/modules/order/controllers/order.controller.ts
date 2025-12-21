@@ -11,13 +11,16 @@ import {
   Req,
   Header,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { OrderService } from '../services/order.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { Ownership } from '../../../common/decorators/ownership.decorator';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { OwnershipGuard } from '../../../common/guards/ownership.guard';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RoleEnum } from '../../../common/enums/role.enum';
 
@@ -57,32 +60,50 @@ export class OrderController {
     return this.orderService.findByUser(userId, { page: Number(page), limit: Number(limit) });
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @Get()
-  @ApiOperation({ summary: 'Admin tìm kiếm, phân trang đơn hàng' })
+  @ApiOperation({ summary: 'Admin/Seller: Tìm kiếm, phân trang đơn hàng (Cả Admin và Seller đều thấy tất cả đơn hàng)' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAll(
+    @Req() req: any,
     @Query('search') search?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
   ) {
-    return this.orderService.findAll({ search, page, limit });
+    const user = req.user;
+    
+    // Extract roles - hỗ trợ nhiều format
+    let userRoles: string[] = [];
+    if (Array.isArray(user?.roles)) {
+      userRoles = user.roles.map((r: any) => (typeof r === 'string' ? r : (r.name || r)));
+    } else if (user?.role) {
+      const roleName = typeof user.role === 'string' ? user.role : (user.role.name || user.role);
+      userRoles = [roleName];
+    } else if (user?.roleName) {
+      userRoles = [user.roleName];
+    }
+    
+    // Cả Admin và Seller đều thấy tất cả đơn hàng (không filter theo sellerId)
+    const sellerId = undefined; // Không filter, cho cả admin và seller thấy tất cả
+    
+    return this.orderService.findAll({ search, page, limit, sellerId });
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @Get(':id')
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'Admin lấy chi tiết đơn hàng' })
+  @ApiOperation({ summary: 'Admin/Seller: Lấy chi tiết đơn hàng (Cả Admin và Seller đều thấy tất cả đơn hàng)' })
   @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng' })
-  async findOne(@Param('id') id: string) {
+  async findOne(@Req() req: any, @Param('id') id: string) {
+    // Cả Admin và Seller đều có thể xem tất cả đơn hàng
     return this.orderService.findOne(id);
   }
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @Patch(':id/status')
-  @ApiOperation({ summary: 'Admin cập nhật trạng thái đơn hàng' })
+  @ApiOperation({ summary: 'Admin/Seller cập nhật trạng thái đơn hàng (Cả Admin và Seller đều có thể cập nhật tất cả)' })
   @ApiBody({ type: UpdateOrderStatusDto })
   @ApiParam({ name: 'id', required: true, description: 'ID của đơn hàng cần cập nhật trạng thái' })
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {

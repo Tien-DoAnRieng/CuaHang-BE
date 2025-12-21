@@ -74,6 +74,75 @@ export class AuthService implements OnApplicationBootstrap {
     }
   }
 
+  /** ✅ Helper: Gửi email OTP với retry logic */
+  private async sendOtpEmail(
+    email: string, 
+    name: string, 
+    otp: string, 
+    userId: string,
+    expiresAt: Date,
+    retries: number = 3
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        this.logger.log(`📧 Attempting to send OTP email to ${email} (attempt ${attempt}/${retries})`);
+        
+        // Kiểm tra cấu hình mail
+        const mailUser = process.env.MAIL_USER;
+        const mailPassword = process.env.MAIL_PASSWORD;
+        
+        if (!mailUser || !mailPassword) {
+          this.logger.error(`❌ Mail configuration missing: MAIL_USER=${!!mailUser}, MAIL_PASSWORD=${!!mailPassword}`);
+          throw new Error('Mail configuration is missing. Please set MAIL_USER and MAIL_PASSWORD in .env file');
+        }
+
+        await this.mailerService.sendMail({
+          to: email,
+          subject: 'Mã xác thực tài khoản',
+          template: 'verify-email',
+          context: { name, otp },
+        });
+        
+        this.logger.log(`✅ OTP email sent successfully to ${email}`);
+        
+        // Log OTP vào database để debug (optional) - với đầy đủ thông tin
+        try {
+          const user = await this.userRepo.findOne({ where: { id: userId } });
+          if (user) {
+            await this.otpLogRepo.save({
+              user,
+              otp,
+              expiresAt,
+              used: false,
+              usedAt: null,
+            });
+            this.logger.log(`✅ OTP logged to database for ${email}`);
+          }
+        } catch (logError) {
+          this.logger.warn(`⚠️ Failed to log OTP to database:`, logError);
+          // Không throw error vì việc log không quan trọng bằng việc gửi email
+        }
+        
+        return true;
+      } catch (mailError: any) {
+        this.logger.error(`❌ Failed to send OTP email to ${email} (attempt ${attempt}/${retries}):`, {
+          error: mailError?.message || mailError,
+          stack: mailError?.stack,
+        });
+        
+        if (attempt === retries) {
+          // Lần cuối cùng thất bại, log chi tiết
+          this.logger.error(`❌ All ${retries} attempts failed. OTP: ${otp} for ${email}`);
+          return false;
+        }
+        
+        // Đợi 1 giây trước khi retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    return false;
+  }
+
   /** ✅ Đăng ký user mặc định là customer */
   async register(dto: RegisterUserDto) {
     const exist = await this.userRepo.findOne({ where: { email: dto.email } });
@@ -96,12 +165,27 @@ export class AuthService implements OnApplicationBootstrap {
     const otpExpiresAt = addMinutes(new Date(), 10);
     await this.userRepo.update(newUser.id, { otp, otpExpiresAt });
 
-    await this.mailerService.sendMail({
-      to: newUser.email,
-      subject: 'Mã xác thực tài khoản',
-      template: 'verify-email',
-      context: { name: newUser.name },
-    });
+    // Gửi email OTP với retry logic (truyền đầy đủ tham số)
+    const emailSent = await this.sendOtpEmail(
+      newUser.email, 
+      newUser.name, 
+      otp, 
+      newUser.id, 
+      otpExpiresAt
+    );
+    
+    if (!emailSent) {
+      // Nếu không gửi được email, vẫn lưu OTP vào DB để user có thể xem trong console/logs
+      this.logger.warn(`⚠️ OTP for ${newUser.email}: ${otp} (Email sending failed, but OTP is saved in database)`);
+      // Có thể throw error hoặc trả về OTP trong response để debug (chỉ trong development)
+      if (process.env.NODE_ENV === 'development') {
+        return { 
+          message: 'Đăng ký thành công, nhưng không thể gửi email. OTP đã được lưu trong database.',
+          otp: otp, // Chỉ trả về trong development
+          email: newUser.email,
+        };
+      }
+    }
 
     return { message: 'Đăng ký thành công, vui lòng kiểm tra email để lấy mã xác thực' };
   }
@@ -124,6 +208,19 @@ export class AuthService implements OnApplicationBootstrap {
     return { message: 'Xác thực thành công' };
   }
 
+  /** ✅ Helper: Tạo JWT token với format nhất quán */
+  private createJwtToken(user: User): string {
+    const roleName = user.role?.name || RoleEnum.CUSTOMER;
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      roles: [roleName], // Luôn là array
+      roleName: roleName, // Thêm roleName để dễ truy cập
+    };
+    const secret = this.configService.get<string>('JWT_SECRET');
+    return this.jwtService.sign(payload, { secret });
+  }
+
   /** ✅ Đăng nhập user */
   async login(dto: LoginDto) {
     const user = await this.userRepo.findOne({
@@ -143,12 +240,11 @@ export class AuthService implements OnApplicationBootstrap {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Mật khẩu không đúng');
 
-    const payload = { sub: user.id, roles: [user.role.name] };
-    const secret = this.configService.get<string>('JWT_SECRET');
-    const token = this.jwtService.sign(payload, { secret });
+    // Sử dụng helper method để tạo token với format nhất quán
+    const token = this.createJwtToken(user);
 
     const { passwordHash, otp, otpExpiresAt, ...result } = user;
-    return { access_token: token, user: result };
+    return { access_token: token, accessToken: token, user: result };
   }
 
   /** ✅ Admin cập nhật quyền người dùng */
@@ -236,7 +332,7 @@ export class AuthService implements OnApplicationBootstrap {
     // 🧱 Nếu chưa có → tạo mới
     if (!user) {
       let defaultRole = await this.roleRepo.findOne({
-        where: { name: RoleEnum.CUSTOMER }, // hoặc RoleEnum.USER theo enum của bạn
+        where: { name: RoleEnum.CUSTOMER },
       });
 
       if (!defaultRole) {
@@ -255,13 +351,8 @@ export class AuthService implements OnApplicationBootstrap {
       await this.userRepo.save(user);
     }
 
-    // 🪪 Tạo JWT token
-    const secret = this.configService.get<string>('JWT_SECRET');
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role?.name,
-    }, { secret });
+    // 🪪 Sử dụng helper method để tạo token với format nhất quán
+    const token = this.createJwtToken(user);
 
     return {
       message: 'Google login success',

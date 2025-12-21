@@ -45,7 +45,7 @@ export class ProductAnalyticsService {
       sold: Number(r.sold),
     }));
   }
-  async getTopSellingAdmin({ page = 1, limit = 20, from, to, categoryId }: { page?: number; limit?: number; from?: string; to?: string; categoryId?: string }) {
+  async getTopSellingAdmin({ page = 1, limit = 20, from, to, categoryId, sellerId }: { page?: number; limit?: number; from?: string; to?: string; categoryId?: string; sellerId?: string }) {
     const statuses = [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED];
 
     const offset = (page - 1) * limit;
@@ -77,6 +77,7 @@ export class ProductAnalyticsService {
       if (!isNaN(t.getTime())) qb.andWhere('o.created_at <= :to', { to: t });
     }
     if (categoryId) qb.andWhere('p.category_id = :cat', { cat: categoryId });
+    if (sellerId) qb.andWhere('p.seller_id = :sellerId', { sellerId });
 
     const rows = await qb.getRawMany();
     const countQb = this.orderItemRepository.createQueryBuilder('oi')
@@ -93,6 +94,7 @@ export class ProductAnalyticsService {
       if (!isNaN(t.getTime())) countQb.andWhere('o.created_at <= :to', { to: t });
     }
     if (categoryId) countQb.andWhere('p.category_id = :cat', { cat: categoryId });
+    if (sellerId) countQb.andWhere('p.seller_id = :sellerId', { sellerId });
 
     const countRaw = await countQb.select('COUNT(DISTINCT p.id)', 'cnt').getRawOne();
     const total = countRaw ? Number(countRaw.cnt) : 0;

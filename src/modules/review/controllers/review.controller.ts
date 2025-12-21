@@ -13,7 +13,9 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
+import { OwnershipGuard } from '../../../common/guards/ownership.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { Ownership } from '../../../common/decorators/ownership.decorator';
 import { RoleEnum } from '../../../common/enums/role.enum';
 import { ReviewService } from '../services/review.service';
 import { CreateReviewDto } from '../dto/create-review.dto';
@@ -43,17 +45,20 @@ export class ReviewController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth('access-token')
   @Get()
-  @ApiOperation({ summary: 'Admin: Xem tất cả đánh giá (phân trang, tìm kiếm, filter theo status)' })
-  async findAllAdmin(@Query() q: QueryReviewDto) {
+  @ApiOperation({ summary: 'Admin/Seller: Xem đánh giá (Cả Admin và Seller đều thấy tất cả đánh giá)' })
+  async findAllAdmin(@Req() req: any, @Query() q: QueryReviewDto) {
     const page = Number(q.page) || 1;
     const limit = Number(q.limit) || 20;
+    
+    // Cả Admin và Seller đều thấy tất cả đánh giá (không filter theo sellerId)
     return this.reviewService.findAllAdmin({ 
       productId: q.productId, 
       userId: q.userId,
-      status: q.status 
+      status: q.status,
+      sellerId: undefined // Không filter, cho cả admin và seller thấy tất cả
     }, page, limit);
   }
 
@@ -77,12 +82,12 @@ export class ReviewController {
     return this.reviewService.remove(id, userId, false);
   }
 
-  // Admin delete - separate route to clarify permissions
+  // Admin/Seller delete - separate route to clarify permissions
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth('access-token')
   @Delete('admin/:id')
-  @ApiOperation({ summary: 'Admin: Xoá đánh giá vi phạm' })
+  @ApiOperation({ summary: 'Admin/Seller: Xoá đánh giá vi phạm (Cả Admin và Seller đều có thể xóa tất cả)' })
   async adminRemove(@Param('id') id: string) {
     return this.reviewService.remove(id, undefined, true);
   }
@@ -117,12 +122,12 @@ export class ReviewController {
     return this.reviewService.markAsViolated(id);
   }
 
-  // Admin add reply to review
+  // Admin/Seller add reply to review
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.ADMIN)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @ApiBearerAuth('access-token')
   @Post('admin/:id/reply')
-  @ApiOperation({ summary: 'Admin: Phản hồi đánh giá' })
+  @ApiOperation({ summary: 'Admin/Seller: Phản hồi đánh giá (Cả Admin và Seller đều có thể phản hồi tất cả)' })
   async addReply(@Param('id') id: string, @Body() body: { reply: string }) {
     return this.reviewService.addReply(id, body.reply);
   }

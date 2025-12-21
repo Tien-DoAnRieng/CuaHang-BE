@@ -9,6 +9,7 @@ import { Payment } from '../../shared/schemas/entities/payment.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
 import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
 import { Product } from '../../shared/schemas/entities/product.entity';
+import { Review } from '../../shared/schemas/entities/review.entity';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
 import { QueueModule } from '../queue/queue.module';
@@ -20,7 +21,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Address, Order, OrderItem, Payment, User, ProductVariant, Product]),
+    TypeOrmModule.forFeature([Address, Order, OrderItem, Payment, User, ProductVariant, Product, Review]),
     QueueModule,
     CouponModule,
     CartModule,

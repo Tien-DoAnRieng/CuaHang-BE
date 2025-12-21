@@ -10,11 +10,21 @@ export class RolesGuard implements CanActivate {
     if (!requiredRoles) return true;
 
     const { user } = context.switchToHttp().getRequest();
-    if (!user || !user.roles) return false;
+    if (!user) return false;
 
-    const userRoles = Array.isArray(user.roles)
-      ? user.roles.map(r => (typeof r === 'string' ? r : r.name))
-      : [];
+    // Extract roles từ user object - hỗ trợ nhiều format
+    let userRoles: string[] = [];
+    if (Array.isArray(user.roles)) {
+      userRoles = user.roles.map((r: any) => typeof r === 'string' ? r : (r.name || r));
+    } else if (user.role) {
+      // Nếu có role object
+      const roleName = typeof user.role === 'string' ? user.role : (user.role.name || user.role);
+      userRoles = [roleName];
+    } else if (typeof user.roles === 'string') {
+      userRoles = [user.roles];
+    }
+
+    if (userRoles.length === 0) return false;
 
     return requiredRoles.some(role => userRoles.includes(role));
   }
