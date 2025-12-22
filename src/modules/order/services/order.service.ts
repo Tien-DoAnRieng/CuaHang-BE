@@ -166,8 +166,48 @@ export class OrderService {
       // Không throw error vì order đã tạo thành công
     }
 
-    const orderWithItems = await this.orderRepository.findOne({ where: { id: saved.id }, relations: ['items', 'payments', 'shippingAddress'] });
+    const orderWithItems = await this.orderRepository.findOne({ 
+      where: { id: saved.id }, 
+      relations: ['items', 'payments', 'shippingAddress', 'user'] 
+    });
     if (!orderWithItems) throw new Error('Order not found after save');
+
+    // Gửi email xác nhận đơn hàng khi đặt hàng thành công
+    if (orderWithItems.user?.email) {
+      const emailData = {
+        to: orderWithItems.user.email,
+        customerName: orderWithItems.user.name || orderWithItems.user.email,
+        orderId: saved.id,
+        status: OrderStatus.PENDING,
+        orderTotal: orderWithItems.totalAmount || 0,
+      };
+
+      try {
+        await this.queueService.addOrderStatusEmailJob(emailData);
+        this.logger.debug(`✅ Order confirmation email queued for order ${saved.id}`);
+      } catch (error: any) {
+        // Nếu queue fail (Redis không có), thử gửi trực tiếp
+        if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('redis')) {
+          this.logger.warn(`⚠️ Redis unavailable, sending order confirmation email directly for order ${saved.id}`);
+          try {
+            await this.sendEmailDirectly(
+              emailData.to,
+              emailData.customerName,
+              emailData.orderId,
+              emailData.status,
+              emailData.orderTotal
+            );
+            this.logger.log(`✅ Order confirmation email sent directly (Redis unavailable) for order ${saved.id}`);
+          } catch (directError: any) {
+            // Log lỗi nhưng không throw để không ảnh hưởng đến việc tạo order
+            this.logger.error(`❌ Failed to send order confirmation email (both queue and direct):`, directError);
+          }
+        } else {
+          this.logger.error(`❌ Failed to queue order confirmation email:`, error);
+        }
+      }
+    }
+
     return orderWithItems;
   }
 
@@ -303,39 +343,60 @@ export class OrderService {
     }
 
     // Gửi email thông báo khi trạng thái thay đổi (chỉ khi status thực sự thay đổi)
-    if (oldStatus !== status && order.user?.email) {
-      const emailData = {
-        to: order.user.email,
-        customerName: order.user.name || order.user.email,
-        orderId: id,
-        status: status,
-        orderTotal: order.totalAmount || 0,
-      };
-
-      try {
-        await this.queueService.addOrderStatusEmailJob(emailData);
-        this.logger.debug(`✅ Email queued for order ${id} status change`);
-      } catch (error: any) {
-        // Nếu queue fail (Redis không có), thử gửi trực tiếp
-        if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('redis')) {
-          this.logger.warn(`⚠️ Redis unavailable, sending email directly for order ${id}`);
-          try {
-            await this.sendEmailDirectly(
-              emailData.to,
-              emailData.customerName,
-              emailData.orderId,
-              emailData.status,
-              emailData.orderTotal
-            );
-            this.logger.log(`✅ Email sent directly (Redis unavailable) for order ${id}`);
-          } catch (directError: any) {
-            // Log lỗi nhưng không throw để không ảnh hưởng đến việc update status
-            this.logger.error(`❌ Failed to send email (both queue and direct):`, directError);
-          }
-        } else {
-          this.logger.error(`❌ Failed to queue order status email:`, error);
-        }
+    if (oldStatus !== status) {
+      this.logger.log(`📧 Order ${id} status changed from ${oldStatus} to ${status}`);
+      
+      // Reload order với user relation để đảm bảo có user data
+      const orderWithUser = await this.orderRepository.findOne({ 
+        where: { id }, 
+        relations: ['user'] 
+      });
+      
+      if (!orderWithUser) {
+        this.logger.warn(`⚠️ Cannot send email for order ${id}: Order not found after update`);
+        return saved;
       }
+      
+      if (orderWithUser.user?.email) {
+        const emailData = {
+          to: orderWithUser.user.email,
+          customerName: orderWithUser.user.name || orderWithUser.user.email,
+          orderId: id,
+          status: status,
+          orderTotal: orderWithUser.totalAmount || 0,
+        };
+
+        this.logger.log(`📧 [updateStatus] Preparing to send order status email to ${emailData.to} for order ${id}`);
+        this.logger.log(`📧 [updateStatus] MailerService available: ${!!this.mailerService}`);
+        this.logger.log(`📧 [updateStatus] QueueService available: ${!!this.queueService}`);
+
+        // Luôn thử gửi trực tiếp để đảm bảo email được gửi (bỏ qua queue)
+        try {
+          this.logger.log(`📧 [updateStatus] Sending email directly for order ${id} (bypassing queue)`);
+          await this.sendEmailDirectly(
+            emailData.to,
+            emailData.customerName,
+            emailData.orderId,
+            emailData.status,
+            emailData.orderTotal
+          );
+          this.logger.log(`✅ [updateStatus] Email sent directly for order ${id} - Status: ${oldStatus} → ${status}`);
+        } catch (directError: any) {
+          // Log lỗi nhưng không throw để không ảnh hưởng đến việc update status
+          this.logger.error(`❌ [updateStatus] Failed to send email directly for order ${id}:`, directError?.message || directError);
+          this.logger.error(`❌ [updateStatus] Error stack:`, directError?.stack);
+          if (directError?.response) {
+            this.logger.error(`❌ [updateStatus] SMTP Response:`, directError.response);
+          }
+          if (directError?.code) {
+            this.logger.error(`❌ [updateStatus] Error code:`, directError.code);
+          }
+        }
+      } else {
+        this.logger.warn(`⚠️ [updateStatus] Cannot send email for order ${id}: User email not found. Order user:`, orderWithUser.user ? 'exists but no email' : 'null');
+      }
+    } else {
+      this.logger.debug(`ℹ️ Order ${id} status unchanged (${status}), skipping email`);
     }
 
     return saved;
@@ -351,30 +412,60 @@ export class OrderService {
 
   // Helper: Gửi email trực tiếp (fallback khi queue không hoạt động)
   private async sendEmailDirectly(to: string, customerName: string, orderId: string, status: string, orderTotal: number): Promise<void> {
-    const statusMap: Record<string, string> = {
-      'PENDING': 'Đang chờ xử lý',
-      'PROCESSING': 'Đang xử lý',
-      'PAID': 'Đã thanh toán',
-      'SHIPPED': 'Đã giao hàng',
-      'DELIVERED': 'Đã nhận hàng',
-      'COMPLETED': 'Hoàn thành',
-      'CANCELLED': 'Đã hủy',
-      'REFUNDED': 'Đã hoàn tiền',
-    };
+    try {
+      const statusMap: Record<string, string> = {
+        'PENDING': 'Đang chờ xử lý',
+        'PROCESSING': 'Đang xử lý',
+        'PAID': 'Đã thanh toán',
+        'SHIPPED': 'Đã giao hàng',
+        'DELIVERED': 'Đã nhận hàng',
+        'COMPLETED': 'Hoàn thành',
+        'CANCELLED': 'Đã hủy',
+        'REFUNDED': 'Đã hoàn tiền',
+      };
 
-    const statusText = statusMap[status] || status;
+      const statusText = statusMap[status] || status;
 
-    await this.mailerService.sendMail({
-      to,
-      subject: `Thông báo cập nhật trạng thái đơn hàng #${orderId}`,
-      template: 'order-status',
-      context: {
-        customerName: customerName || 'Quý khách',
+      this.logger.log(`📧 [sendEmailDirectly] Starting email send to ${to} for order ${orderId}`);
+      this.logger.log(`📧 [sendEmailDirectly] Email data:`, {
+        to,
+        customerName,
         orderId,
         status: statusText,
-        orderTotal: orderTotal.toLocaleString('vi-VN'),
-      },
-    });
+        orderTotal,
+      });
+
+      // Kiểm tra mailerService có tồn tại không
+      if (!this.mailerService) {
+        this.logger.error(`❌ [sendEmailDirectly] MailerService is not available!`);
+        throw new Error('MailerService is not available');
+      }
+
+      const emailOptions = {
+        to,
+        subject: `Thông báo cập nhật trạng thái đơn hàng #${orderId}`,
+        template: 'order-status',
+        context: {
+          customerName: customerName || 'Quý khách',
+          orderId,
+          status: statusText,
+          orderTotal: orderTotal.toLocaleString('vi-VN'),
+        },
+      };
+
+      this.logger.log(`📧 [sendEmailDirectly] Email options:`, JSON.stringify(emailOptions, null, 2));
+
+      const result = await this.mailerService.sendMail(emailOptions);
+      
+      this.logger.log(`✅ [sendEmailDirectly] Email sent successfully to ${to} for order ${orderId}`);
+      this.logger.log(`✅ [sendEmailDirectly] Send result:`, result);
+    } catch (error: any) {
+      this.logger.error(`❌ [sendEmailDirectly] Failed to send email directly to ${to} for order ${orderId}`);
+      this.logger.error(`❌ [sendEmailDirectly] Error message:`, error?.message);
+      this.logger.error(`❌ [sendEmailDirectly] Error stack:`, error?.stack);
+      this.logger.error(`❌ [sendEmailDirectly] Full error:`, JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      throw error;
+    }
   }
 
   // Gửi email thông báo trạng thái đơn hàng thủ công (không cần đổi status)

@@ -19,6 +19,9 @@ export class Product extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
+  @Column({ name: 'cost_price', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  costPrice: number;
+
   @Column({ nullable: true })
   brand: string; // Giữ lại để backward compatibility
 

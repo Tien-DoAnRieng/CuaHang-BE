@@ -14,6 +14,8 @@ import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
 import { Order } from '../../shared/schemas/entities/order.entity';
 import { Review } from '../../shared/schemas/entities/review.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
+import { CartItem } from '../../shared/schemas/entities/cart-item.entity';
+import { Wishlist } from '../../shared/schemas/entities/wishlist.entity';
 
 import { ProductVariantModule } from '../product-variant/product-variant.module';
 import { ProductImageModule } from '../product-image/product-image.module';
@@ -46,6 +48,8 @@ import { ProductVariantService } from '../product-variant/services/product-varia
       Order,
       Review,
       User,
+      CartItem,
+      Wishlist,
     ]),
     FlashSaleModule,
     ProductVariantModule,

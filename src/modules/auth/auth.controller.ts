@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, UseGuards, Param, Request, Get, Req, Res } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Param, Request, Get, Req, Res, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiParam, ApiBearerAuth} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -86,20 +86,27 @@ export class AuthController {
 }
  @Patch(':id/role')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(RoleEnum.ADMIN)
-@ApiBearerAuth('access-token') // ⚡ Bật auth cho route này
-@ApiOperation({ summary: 'Admin đổi quyền user' })
+@Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Admin/Seller đổi quyền user (Cả Admin và Seller đều có thể đổi quyền)' })
 @ApiBody({ schema: { properties: { role: { type: 'string', enum: Object.values(RoleEnum) } } } })
 @ApiResponse({ status: 200, description: 'Đổi role thành công' })
+@ApiResponse({ status: 400, description: 'Bad Request - Role không hợp lệ' })
 @ApiResponse({ status: 401, description: 'Unauthorized' })
 @ApiResponse({ status: 403, description: 'Forbidden' })
 async updateUserRole(
   @Param('id') userId: string,
-  @Body('role') newRole: RoleEnum,
+  @Body('role') newRole: string,
   @Request() req,
 ) {
   const adminId = req.user.id;
-  return this.authService.updateUserRole(adminId, userId, newRole);
+  
+  if (!newRole || !Object.values(RoleEnum).includes(newRole as RoleEnum)) {
+    throw new BadRequestException(`Role không hợp lệ. Các role hợp lệ: ${Object.values(RoleEnum).join(', ')}`);
+  }
+  
+  console.log('[AuthController.updateUserRole]', { adminId, userId, newRole });
+  return this.authService.updateUserRole(adminId, userId, newRole as RoleEnum);
 }
 @Post('forgot-password')
 @Public()

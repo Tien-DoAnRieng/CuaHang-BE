@@ -161,7 +161,7 @@ export class ProductController {
   @ApiOperation({ summary: 'Lấy chi tiết sản phẩm' })
   @ApiResponse({ status: 200, description: 'Chi tiết sản phẩm.' })
   findOne(@Param('id') id: string) {
-    return this.productService.findOne(id);
+    return this.productService.findOne(id, true); // Load flashSales khi xem chi tiết
   }
 
   // 🔹 Admin & Seller API

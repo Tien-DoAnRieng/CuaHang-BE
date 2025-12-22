@@ -247,11 +247,16 @@ export class AuthService implements OnApplicationBootstrap {
     return { access_token: token, accessToken: token, user: result };
   }
 
-  /** ✅ Admin cập nhật quyền người dùng */
+  /** ✅ Admin/Seller cập nhật quyền người dùng */
   async updateUserRole(adminId: string, userId: string, newRoleName: RoleEnum) {
     const admin = await this.userRepo.findOne({ where: { id: adminId }, relations: ['role'] });
-    if (!admin || admin.role.name !== RoleEnum.ADMIN) {
-      throw new ForbiddenException('Chỉ admin mới có thể chỉnh quyền');
+    if (!admin) {
+      throw new ForbiddenException('Không tìm thấy người dùng');
+    }
+    
+    const userRole = admin.role?.name?.toLowerCase();
+    if (userRole !== RoleEnum.ADMIN.toLowerCase() && userRole !== RoleEnum.SELLER.toLowerCase()) {
+      throw new ForbiddenException('Chỉ admin và seller mới có thể chỉnh quyền');
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId }, relations: ['role'] });

@@ -1,11 +1,17 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Product } from '../../../shared/schemas/entities/product.entity';
 import { Category } from '../../../shared/schemas/entities/category.entity';
 import { Brand } from '../../../shared/schemas/entities/brand.entity';
 import { ProductVariant } from '../../../shared/schemas/entities/product-variant.entity';
+import { ProductImage } from '../../../shared/schemas/entities/product-image.entity';
 import { FlashSaleItem } from '../../../shared/schemas/entities/flash-sale-item.entity';
+import { FlashSale } from '../../../shared/schemas/entities/flash-sale.entity';
+import { Review } from '../../../shared/schemas/entities/review.entity';
+import { OrderItem } from '../../../shared/schemas/entities/order-item.entity';
+import { CartItem } from '../../../shared/schemas/entities/cart-item.entity';
+import { Wishlist } from '../../../shared/schemas/entities/wishlist.entity';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 
@@ -14,9 +20,15 @@ export class ProductService {
   constructor(
     @InjectRepository(Product) private productRepository: Repository<Product>,
     @InjectRepository(ProductVariant) private variantRepository: Repository<ProductVariant>,
+    @InjectRepository(ProductImage) private productImageRepository: Repository<ProductImage>,
     @InjectRepository(Category) private categoryRepository: Repository<Category>,
     @InjectRepository(Brand) private brandRepository: Repository<Brand>,
     @InjectRepository(FlashSaleItem) private flashSaleItemRepository: Repository<FlashSaleItem>,
+    @InjectRepository(FlashSale) private flashSaleRepository: Repository<FlashSale>,
+    @InjectRepository(Review) private reviewRepository: Repository<Review>,
+    @InjectRepository(OrderItem) private orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(CartItem) private cartItemRepository: Repository<CartItem>,
+    @InjectRepository(Wishlist) private wishlistRepository: Repository<Wishlist>,
   ) {}
 
   /** Tạo sản phẩm */
@@ -41,6 +53,7 @@ export class ProductService {
       name: dto.name,
       description: dto.description,
       price: dto.price,
+      costPrice: dto.costPrice ?? 0, // Lưu costPrice
       brand: dto.brand || brandEntity?.name || '', // Giữ lại brand string để backward compatibility
       status: dto.status ?? 'ACTIVE',
       hasVariants: dto.hasVariants ?? false,
@@ -51,6 +64,28 @@ export class ProductService {
     });
 
     const savedProduct = await this.productRepository.save(product) as Product;
+
+    // Tạo ảnh chính trong product_images nếu có imageUrl
+    if (dto.imageUrl && dto.imageUrl.trim()) {
+      // Kiểm tra xem đã có ảnh chính chưa (tránh duplicate)
+      const existingMainImage = await this.productImageRepository.findOne({
+        where: { productId: savedProduct.id, isMain: true }
+      });
+      
+      if (!existingMainImage) {
+        // Tạo ảnh chính với isMain = true
+        const mainImage = this.productImageRepository.create({
+          productId: savedProduct.id,
+          imageUrl: dto.imageUrl,
+          isMain: true,
+        });
+        await this.productImageRepository.save(mainImage);
+      } else if (existingMainImage.imageUrl !== dto.imageUrl) {
+        // Cập nhật URL của ảnh chính nếu khác
+        existingMainImage.imageUrl = dto.imageUrl;
+        await this.productImageRepository.save(existingMainImage);
+      }
+    }
 
     // Tạo variant nếu có
     if (dto.hasVariants && dto.variants?.length) {
@@ -104,6 +139,7 @@ export class ProductService {
     name: dto.name ?? product.name,
     description: dto.description ?? product.description,
     price: dto.price ?? product.price,
+    costPrice: dto.costPrice !== undefined ? dto.costPrice : (product.costPrice ?? 0), // Cập nhật costPrice
     status: dto.status ?? product.status,
     hasVariants: dto.hasVariants ?? product.hasVariants,
     categoryId: categoryEntity?.id ?? product.categoryId,
@@ -114,6 +150,31 @@ export class ProductService {
   // Thêm image nếu có imageUrl
   if (imageUrl) {
     updateData.image = imageUrl;
+    
+    // Cập nhật hoặc tạo ảnh chính trong product_images
+    const existingMainImage = await this.productImageRepository.findOne({
+      where: { productId: id, isMain: true }
+    });
+    
+    if (existingMainImage) {
+      // Cập nhật URL của ảnh chính
+      existingMainImage.imageUrl = imageUrl;
+      await this.productImageRepository.save(existingMainImage);
+    } else {
+      // Tạo ảnh chính mới nếu chưa có
+      // Đảm bảo không có ảnh chính nào khác
+      await this.productImageRepository.update(
+        { productId: id },
+        { isMain: false }
+      );
+      
+      const mainImage = this.productImageRepository.create({
+        productId: id,
+        imageUrl: imageUrl,
+        isMain: true,
+      });
+      await this.productImageRepository.save(mainImage);
+    }
   }
 
   await this.productRepository.update(id, updateData);
@@ -147,10 +208,17 @@ export class ProductService {
 
 
   /** Lấy sản phẩm theo ID */
-  async findOne(id: string): Promise<Product> {
+  async findOne(id: string, includeFlashSales: boolean = false): Promise<Product> {
+    const relations = ['category', 'brandEntity', 'variants', 'variants.color', 'variants.size', 'images'];
+    
+    // Chỉ load flashSales nếu được yêu cầu (để tránh load không cần thiết khi tạo sản phẩm)
+    if (includeFlashSales) {
+      relations.push('flashSales', 'flashSales.items');
+    }
+    
     const product = await this.productRepository.findOne({
       where: { id },
-      relations: ['category', 'brandEntity', 'variants', 'variants.color', 'variants.size', 'flashSales', 'flashSales.items', 'images'],
+      relations,
     });
     if (!product) throw new BadRequestException('Product not found');
     return product;
@@ -203,6 +271,9 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
   const limitNum = Number(limit) || 20;
   const skip = (pageNum - 1) * limitNum;
 
+  // Sắp xếp sản phẩm mới nhất lên đầu (createdAt DESC)
+  qb.orderBy('product.createdAt', 'DESC');
+
   // Log SQL query trước khi execute
   const sql = qb.getSql();
   const params = qb.getParameters();
@@ -240,6 +311,53 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
 
   /** Xóa sản phẩm */
   async remove(id: string): Promise<void> {
+    // Kiểm tra sản phẩm có tồn tại không
+    const product = await this.productRepository.findOne({ where: { id } });
+    if (!product) {
+      throw new BadRequestException('Product not found');
+    }
+
+    // Lấy tất cả variants của sản phẩm để xóa OrderItem liên quan
+    const variants = await this.variantRepository.find({ where: { productId: id } });
+    const variantIds = variants.map(v => v.id);
+
+    // Xóa các bản ghi liên quan theo thứ tự (từ child đến parent)
+    // 1. Xóa CartItem (nếu có variantId trong variants)
+    // CartItem có composite primary key, cần dùng In() operator
+    if (variantIds.length > 0) {
+      await this.cartItemRepository.delete({ variantId: In(variantIds) });
+    }
+
+    // 2. Xóa OrderItem (nếu có variantId trong variants)
+    // OrderItem có composite primary key (orderId, variantId), cần xóa bằng query builder
+    if (variantIds.length > 0) {
+      await this.orderItemRepository
+        .createQueryBuilder()
+        .delete()
+        .from(OrderItem)
+        .where('variantId IN (:...variantIds)', { variantIds })
+        .execute();
+    }
+
+    // 3. Xóa Wishlist (có productId)
+    await this.wishlistRepository.delete({ productId: id });
+
+    // 4. Xóa FlashSaleItem (có productId)
+    await this.flashSaleItemRepository.delete({ productId: id });
+
+    // 5. Xóa FlashSale (có productId)
+    await this.flashSaleRepository.delete({ productId: id });
+
+    // 6. Xóa Review (có productId)
+    await this.reviewRepository.delete({ productId: id });
+
+    // 7. Xóa ProductImage (có productId)
+    await this.productImageRepository.delete({ productId: id });
+
+    // 8. Xóa ProductVariant (có productId)
+    await this.variantRepository.delete({ productId: id });
+
+    // 9. Cuối cùng xóa Product
     await this.productRepository.delete(id);
   }
 
