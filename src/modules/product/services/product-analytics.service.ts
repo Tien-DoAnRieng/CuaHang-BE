@@ -16,12 +16,16 @@ export class ProductAnalyticsService {
     const qb = this.orderItemRepository.createQueryBuilder('oi')
       .innerJoin('product_variants', 'pv', 'oi.variant_id = pv.id')
       .innerJoin('products', 'p', 'pv.product_id = p.id')
+      .leftJoin('product_images', 'pi', 'pi.product_id = p.id')
       .innerJoin('orders', 'o', 'oi.order_id = o.id')
       .where('o.status IN (:...statuses)', { statuses })
-      .select('p.id', 'productId')
+      .select('p.id', 'id')
       .addSelect('p.name', 'name')
       .addSelect('p.price', 'price')
       .addSelect('p.brand', 'brand')
+      .addSelect('p.description', 'description')
+      .addSelect('p.category_id', 'categoryId')
+      .addSelect("COALESCE(MAX(CASE WHEN pi.is_main = 1 THEN pi.image_url END), MIN(pi.image_url))", 'mainImage')
       .addSelect('SUM(oi.quantity)', 'sold')
       .groupBy('p.id')
       .orderBy('sold', 'DESC')
@@ -38,11 +42,14 @@ export class ProductAnalyticsService {
 
     const rows = await qb.getRawMany();
     return rows.map(r => ({
-      productId: r.productId,
+      id: r.id,
       name: r.name,
       brand: r.brand,
       price: Number(r.price),
+      description: r.description,
+      categoryId: r.categoryId,
       sold: Number(r.sold),
+      images: r.mainImage ? [{ imageUrl: r.mainImage, isPrimary: true }] : [],
     }));
   }
   async getTopSellingAdmin({ page = 1, limit = 20, from, to, categoryId, sellerId }: { page?: number; limit?: number; from?: string; to?: string; categoryId?: string; sellerId?: string }) {

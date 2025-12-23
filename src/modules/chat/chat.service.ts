@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChatMessage } from '../../shared/schemas/chat-message.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
+import { v2 as cloudinary } from 'cloudinary';
+const streamifier = require('streamifier');
 
 @Injectable()
 export class ChatService {
@@ -14,12 +16,13 @@ export class ChatService {
   ) {}
 
   // User gửi tin nhắn
-  async sendMessage(userId: string, message: string) {
-    console.log('sendMessage called with userId:', userId, 'message:', message);
+  async sendMessage(userId: string, message: string, imageUrl?: string) {
+    console.log('sendMessage called with userId:', userId, 'message:', message, 'imageUrl:', imageUrl);
     
     const chatMessage = this.chatMessageRepo.create({
       userId,
       message,
+      imageUrl,
       sender: 'user',
       isRead: false,
     });
@@ -31,10 +34,11 @@ export class ChatService {
   }
 
   // Admin reply tin nhắn
-  async adminReply(userId: string, message: string) {
+  async adminReply(userId: string, message: string, imageUrl?: string) {
     const chatMessage = this.chatMessageRepo.create({
       userId,
       message,
+      imageUrl,
       sender: 'admin',
       isRead: false,
     });
@@ -88,6 +92,33 @@ export class ChatService {
       where: { sender: 'user', isRead: false },
     });
     return { count };
+  }
+
+  // Upload ảnh chat lên Cloudinary
+  async uploadChatImage(file: Express.Multer.File): Promise<{ imageUrl: string }> {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'chat-images',
+          resource_type: 'auto',
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else if (result) {
+            resolve({ imageUrl: result.secure_url });
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        },
+      );
+
+      streamifier.createReadStream(file.buffer).pipe(uploadStream);
+    });
   }
 
   

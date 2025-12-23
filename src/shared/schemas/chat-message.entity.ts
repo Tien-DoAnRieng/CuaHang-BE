@@ -23,6 +23,9 @@ export class ChatMessage {
   @Column({ type: 'text' })
   message: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  imageUrl: string;
+
   @Column({ type: 'enum', enum: ['user', 'admin'], default: 'user' })
   sender: 'user' | 'admin';
 

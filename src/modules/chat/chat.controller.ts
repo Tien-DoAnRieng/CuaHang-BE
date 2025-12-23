@@ -6,8 +6,11 @@ import {
   Param,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { AdminReplyDto } from './dto/admin-reply.dto';
@@ -29,7 +32,18 @@ export class ChatController {
   async sendMessage(@Request() req, @Body() dto: SendMessageDto) {
     console.log('Chat send - req.user:', req.user);
     console.log('Chat send - userId:', req.user?.id);
-    return this.chatService.sendMessage(req.user.id, dto.message);
+    return this.chatService.sendMessage(req.user.id, dto.message, dto.imageUrl);
+  }
+
+  // Upload ảnh cho chat (user)
+  @Post('upload-image')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload ảnh cho chat' })
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+    return this.chatService.uploadChatImage(file);
   }
 
   // User lấy lịch sử chat của mình
@@ -48,7 +62,7 @@ export class ChatController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin/Seller phản hồi tin nhắn' })
   async adminReply(@Body() dto: AdminReplyDto) {
-    return this.chatService.adminReply(dto.userId, dto.message);
+    return this.chatService.adminReply(dto.userId, dto.message, dto.imageUrl);
   }
 
   // Admin/Seller: Lấy danh sách conversations
@@ -89,6 +103,18 @@ export class ChatController {
   @ApiOperation({ summary: 'Lấy số tin nhắn chưa đọc' })
   async getUnreadCount() {
     return this.chatService.getUnreadCount();
+  }
+
+  // Upload ảnh cho chat (admin/seller)
+  @Post('admin/upload-image')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin/Seller upload ảnh cho chat' })
+  async adminUploadImage(@UploadedFile() file: Express.Multer.File) {
+    return this.chatService.uploadChatImage(file);
   }
 
 }

@@ -399,7 +399,9 @@ async findAllWithRelations(query: any) {
     .leftJoinAndSelect('product.variants', 'variants')
     .leftJoinAndSelect('variants.color', 'color')
     .leftJoinAndSelect('variants.size', 'size')
-    .leftJoinAndSelect('product.images', 'images');
+    .leftJoinAndSelect('product.images', 'images')
+    .leftJoinAndSelect('product.flashSales', 'flashSales')
+    .leftJoinAndSelect('flashSales.items', 'flashSaleItems');
 
   if (query.q) {
     qb.andWhere('product.name LIKE :q', { q: `%${query.q}%` });

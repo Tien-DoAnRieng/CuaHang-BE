@@ -48,15 +48,47 @@ export class OrderService {
     if (address.userId !== userId) throw new ForbiddenException('Shipping address does not belong to user');
     if (!Array.isArray(dto.items) || dto.items.length === 0) throw new BadRequestException('No items provided');
     const variantIds = dto.items.map(i => i.variantId);
-    const variants = await this.variantRepository.find({ where: { id: In(variantIds) }, relations: ['product'] });
+    const variants = await this.variantRepository.find({ 
+      where: { id: In(variantIds) }, 
+      relations: ['product', 'product.flashSales', 'product.flashSales.items'] 
+    });
     const variantMap = new Map(variants.map(v => [v.id, v]));
+    
+    // Helper: Get price for variant (check flash sale first)
+    const getVariantPrice = (variant: ProductVariant): number => {
+      const now = new Date();
+      
+      // Check flash sale
+      if (variant.product && variant.product.flashSales) {
+        const activeFlashSale = variant.product.flashSales.find((fs: any) => {
+          if (!fs.isActive) return false;
+          const startTime = new Date(fs.startTime);
+          const endTime = new Date(fs.endTime);
+          return now >= startTime && now <= endTime;
+        });
+
+        if (activeFlashSale && activeFlashSale.items) {
+          const flashSaleItem = activeFlashSale.items.find((fsi: any) => 
+            fsi.productVariantId === variant.id
+          );
+
+          if (flashSaleItem && flashSaleItem.salePrice) {
+            return Number(flashSaleItem.salePrice);
+          }
+        }
+      }
+      
+      // Fallback: priceOverride or product price
+      const rawPrice = variant.priceOverride ?? variant.product?.price;
+      return parseFloat(String(rawPrice));
+    };
+    
     let computedTotal = 0;
     for (const it of dto.items) {
       const v = variantMap.get(it.variantId);
       if (!v) throw new BadRequestException(`Variant not found: ${it.variantId}`);
-      // product.price (decimal) may come as string from DB; normalize with parseFloat
-      const rawPrice = v.priceOverride ?? v.product?.price;
-      const priceNum = parseFloat(String(rawPrice));
+      
+      const priceNum = getVariantPrice(v);
       if (Number.isNaN(priceNum)) throw new BadRequestException(`Price not available for variant ${it.variantId}`);
       if (v.stockQuantity < it.quantity) throw new BadRequestException(`Insufficient stock for variant ${it.variantId}`);
       computedTotal += priceNum * Number(it.quantity);
@@ -95,8 +127,7 @@ export class OrderService {
     if (providedCents !== expectedCents) {
       const breakdown = dto.items.map(it => {
         const v = variantMap.get(it.variantId);
-        const rawPrice = v ? (v.priceOverride ?? v.product?.price) : null;
-        const priceNum = rawPrice != null ? parseFloat(String(rawPrice)) : null;
+        const priceNum = v ? getVariantPrice(v) : null;
         const qty = Number(it.quantity || 0);
         return {
           variantId: it.variantId,

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
 
 export class AdminReplyDto {
   @ApiProperty({ example: 'abc123-456-def' })
@@ -11,4 +11,9 @@ export class AdminReplyDto {
   @IsString()
   @IsNotEmpty()
   message: string;
+
+  @ApiProperty({ example: 'https://res.cloudinary.com/...', required: false })
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
 }

@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Review } from '../../../shared/schemas/entities/review.entity';
 import { Order } from '../../../shared/schemas/entities/order.entity';
 import { OrderItem } from '../../../shared/schemas/entities/order-item.entity';
@@ -57,19 +57,39 @@ export class ReviewService {
     }
   }
 
-  // Ensure user bought the product in a PAID order
+  // Ensure user bought the product in a DELIVERED/COMPLETED order
   private async userHasPurchasedProduct(userId: string, productId: string): Promise<boolean> {
+    const validStatuses = [
+      OrderStatus.DELIVERED,  // Đã nhận hàng
+      OrderStatus.COMPLETED,  // Hoàn thành
+    ];
+    
+    console.log(`[Review] Checking purchase for userId=${userId}, productId=${productId}`);
+    
     const orders = await this.orderRepo.find({
-      where: { userId, status: OrderStatus.PAID },
+      where: { 
+        userId, 
+        status: In(validStatuses),
+      },
       relations: ['items', 'items.variant'],
     });
+
+    console.log(`[Review] Found ${orders.length} valid orders for user`);
 
     for (const o of orders) {
       if (!o.items) continue;
       for (const it of o.items) {
-        if (it.variant && (it.variant as ProductVariant).productId === productId) return true;
+        // Kiểm tra productId từ variant hoặc trực tiếp từ item
+        const itemProductId = it.variant?.productId || (it as any).productId;
+        console.log(`[Review] Order ${o.id} - Item productId: ${itemProductId}, looking for: ${productId}`);
+        if (itemProductId === productId) {
+          console.log(`[Review] ✅ User has purchased this product`);
+          return true;
+        }
       }
     }
+    
+    console.log(`[Review] ❌ User has NOT purchased this product`);
     return false;
   }
 
@@ -108,18 +128,25 @@ export class ReviewService {
       take: limit,
     });
 
+    // Tính average rating CHỈ từ reviews đã approved
     const avg = await this.reviewRepo
       .createQueryBuilder('r')
       .select('AVG(r.rating)', 'avg')
       .where('r.productId = :productId', { productId })
+      .andWhere('r.status = :status', { status: 'approved' })
       .getRawOne();
+
+    const averageRating = Number(avg?.avg ?? 0);
+
+    console.log(`[Review] Product ${productId}: ${total} approved reviews, avgRating: ${averageRating.toFixed(1)}`);
 
     return {
       data,
       total,
       page,
       limit,
-      averageRating: Number(avg?.avg ?? 0),
+      averageRating,
+      totalReviews: total, // Thêm field này để frontend dễ hiển thị
     };
   }
 

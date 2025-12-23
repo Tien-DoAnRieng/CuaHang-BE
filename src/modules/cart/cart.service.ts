@@ -16,11 +16,48 @@ export class CartService {
   async getUserCart(userId: string): Promise<Cart> {
     let cart = await this.cartRepo.findOne({
       where: { userId },
-      relations: ['items', 'items.variant', 'items.variant.product', 'items.variant.product.images', 'items.variant.color', 'items.variant.size'],
+      relations: [
+        'items', 
+        'items.variant', 
+        'items.variant.product', 
+        'items.variant.product.images', 
+        'items.variant.product.flashSales', 
+        'items.variant.product.flashSales.items',
+        'items.variant.color', 
+        'items.variant.size'
+      ],
     });
     if (!cart) {
       cart = this.cartRepo.create({ userId });
       await this.cartRepo.save(cart);
+    }
+
+    // Xử lý flash sale price cho từng item
+    if (cart.items) {
+      const now = new Date();
+      cart.items.forEach(item => {
+        if (item.variant && item.variant.product && item.variant.product.flashSales) {
+          // Tìm flash sale đang active
+          const activeFlashSale = item.variant.product.flashSales.find((fs: any) => {
+            if (!fs.isActive) return false;
+            const startTime = new Date(fs.startTime);
+            const endTime = new Date(fs.endTime);
+            return now >= startTime && now <= endTime;
+          });
+
+          if (activeFlashSale && activeFlashSale.items) {
+            // Tìm flash sale item tương ứng với variant này
+            const flashSaleItem = activeFlashSale.items.find((fsi: any) => 
+              fsi.productVariantId === item.variantId
+            );
+
+            if (flashSaleItem && flashSaleItem.salePrice) {
+              // Gán flash sale price vào variant.priceOverride để frontend hiển thị đúng
+              item.variant.priceOverride = Number(flashSaleItem.salePrice);
+            }
+          }
+        }
+      });
     }
 
     return cart;

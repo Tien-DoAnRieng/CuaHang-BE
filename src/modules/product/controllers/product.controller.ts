@@ -155,6 +155,26 @@ export class ProductController {
     return this.productService.findAll({ ...query, sellerId });
   }
 
+  // 🔹 Public API - Top Selling (must be before :id route)
+  @Public()
+  @Get('top-selling')
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Last N days to consider' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm bán chạy (top-selling)' })
+  async topSelling(@Query('limit') limit?: number, @Query('days') days?: number, @Query('categoryId') categoryId?: string) {
+    const l = limit ? Number(limit) : 10;
+    const d = days ? Number(days) : undefined;
+    return this.productAnalyticsService.getTopSelling({ limit: l, days: d, categoryId });
+  }
+
+  @Public()
+  @Get('with-relations/list')
+  @ApiOperation({ summary: 'Lấy danh sách sản phẩm kèm biến thể + màu + size + ảnh' })
+  async findAllWithRelations(@Query() query: any) {
+    return this.productService.findAllWithRelations(query);
+  }
+
   @Public()
   @Get(':id')
   @ApiParam({ name: 'id', required: true })
@@ -221,18 +241,6 @@ export class ProductController {
     return result;
   }
 
-  @Public()
-  @Get('top-selling')
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Last N days to consider' })
-  @ApiQuery({ name: 'categoryId', required: false })
-  @ApiOperation({ summary: 'Lấy danh sách sản phẩm bán chạy (top-selling)' })
-  async topSelling(@Query('limit') limit?: number, @Query('days') days?: number, @Query('categoryId') categoryId?: string) {
-    const l = limit ? Number(limit) : 10;
-    const d = days ? Number(days) : undefined;
-    return this.productAnalyticsService.getTopSelling({ limit: l, days: d, categoryId });
-  }
-
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
   @Get('admin/top-selling')
@@ -252,11 +260,4 @@ export class ProductController {
     
     return this.productAnalyticsService.getTopSellingAdmin({ page: p, limit: l, from, to, categoryId, sellerId });
   }
-@Public()
-@Get('with-relations/list')
-@ApiOperation({ summary: 'Lấy danh sách sản phẩm kèm biến thể + màu + size + ảnh' })
-async findAllWithRelations(@Query() query: any) {
-  return this.productService.findAllWithRelations(query);
-}
-
 }
