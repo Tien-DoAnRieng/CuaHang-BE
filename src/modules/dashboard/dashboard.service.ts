@@ -76,7 +76,9 @@ export class DashboardService {
     const totalCustomers = sellerId ? 0 : await this.userRepo.count();
 
     const revenueGrowth =
-      lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
+      lastRevenue > 0 
+        ? parseFloat((((currentRevenue - lastRevenue) / lastRevenue) * 100).toFixed(2))
+        : 0;
 
     return {
       totalRevenue: currentRevenue,

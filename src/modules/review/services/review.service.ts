@@ -114,7 +114,7 @@ export class ReviewService {
       userId,
       rating: dto.rating,
       comment: sanitizedComment,
-      status: 'pending', // Mặc định là pending, admin sẽ approve
+      status: 'approved', // Tự động duyệt, không cần admin phê duyệt
     });
     return this.reviewRepo.save(r);
   }
