@@ -4,9 +4,13 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatMessage } from '../../shared/schemas/chat-message.entity';
 import { User } from '../../shared/schemas/entities/user.entity';
+import { Product } from '../../shared/schemas/entities/product.entity';
+import { OrderItem } from '../../shared/schemas/entities/order-item.entity';
+import { FlashSale } from '../../shared/schemas/entities/flash-sale.entity';
+import { FlashSaleItem } from '../../shared/schemas/entities/flash-sale-item.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ChatMessage, User])],
+  imports: [TypeOrmModule.forFeature([ChatMessage, User, Product, OrderItem, FlashSale, FlashSaleItem])],
   controllers: [ChatController],
   providers: [ChatService],
   exports: [ChatService],

@@ -14,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { AdminReplyDto } from './dto/admin-reply.dto';
+import { AskAiDto } from './dto/ask-ai.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -33,6 +34,14 @@ export class ChatController {
     console.log('Chat send - req.user:', req.user);
     console.log('Chat send - userId:', req.user?.id);
     return this.chatService.sendMessage(req.user.id, dto.message, dto.imageUrl);
+  }
+
+  @Post('ask-ai')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'User hoi AI tro ly ve san pham' })
+  async askAi(@Request() req, @Body() dto: AskAiDto) {
+    return this.chatService.askAiAboutProducts(req.user.id, dto.message, dto.productId);
   }
 
   // Upload ảnh cho chat (user)

@@ -244,7 +244,15 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
   if (q)
     qb.andWhere('(LOWER(product.name) LIKE :q OR LOWER(product.description) LIKE :q)', { q: `%${q.toLowerCase()}%` });
 
-  if (brand) qb.andWhere('product.brand = :brand', { brand });
+  if (brand) {
+    if (brand.includes('-')) {
+      qb.andWhere('product.brandId = :brandId', { brandId: brand });
+    } else {
+      qb.andWhere('(LOWER(product.brand) = :brandName OR LOWER(brandEntity.name) = :brandName)', {
+        brandName: brand.toLowerCase(),
+      });
+    }
+  }
 
   if (status) qb.andWhere('product.status = :status', { status });
 

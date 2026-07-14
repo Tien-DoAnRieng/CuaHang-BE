@@ -16,17 +16,18 @@ CREATE TABLE IF NOT EXISTS users (
     id CHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
-);
-
-CREATE TABLE IF NOT EXISTS user_roles (
-    user_id CHAR(36),
+    password_hash VARCHAR(255),
     role_id CHAR(36),
-    PRIMARY KEY (user_id, role_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
+    is_verified BOOLEAN DEFAULT false,
+    is_blocked BOOLEAN DEFAULT false,
+    otp VARCHAR(6),
+    otp_expires_at DATETIME,
+    phone VARCHAR(20),
+    gender ENUM('MALE', 'FEMALE', 'OTHER'),
+    date_of_birth DATE,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -141,13 +142,14 @@ CREATE TABLE IF NOT EXISTS addresses (
 CREATE TABLE IF NOT EXISTS orders (
     id CHAR(36) PRIMARY KEY,
     user_id CHAR(36) NOT NULL,
-    address_id CHAR(36) NOT NULL,
+    shipping_address_id CHAR(36) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
     total_amount DECIMAL(10,2) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
     created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
-    FOREIGN KEY (address_id) REFERENCES addresses(id) ON DELETE RESTRICT
+    FOREIGN KEY (shipping_address_id) REFERENCES addresses(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS order_items (
@@ -218,4 +220,98 @@ CREATE TABLE IF NOT EXISTS files (
     entity_id CHAR(36),
     created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
+
+CREATE TABLE IF NOT EXISTS banners (
+    id CHAR(36) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    image_url VARCHAR(255),
+    active BOOLEAN DEFAULT true,
+    priority INT DEFAULT 0,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
+
+CREATE TABLE IF NOT EXISTS coupons (
+    id CHAR(36) PRIMARY KEY,
+    code VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    discount_type ENUM('PERCENT', 'AMOUNT') DEFAULT 'PERCENT',
+    discount_value DECIMAL(10,2) NOT NULL,
+    min_order_amount DECIMAL(10,2),
+    max_discount_amount DECIMAL(10,2),
+    start_date DATETIME,
+    end_date DATETIME,
+    usage_limit INT DEFAULT 0,
+    used_count INT DEFAULT 0,
+    usage_limit_per_user INT DEFAULT 1,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
+    applicable_categories TEXT,
+    applicable_products TEXT,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
+
+CREATE TABLE IF NOT EXISTS member_types (
+    id CHAR(36) PRIMARY KEY,
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    min_orders INT DEFAULT 0,
+    min_spent DECIMAL(10,2) DEFAULT 0,
+    discount_percent INT DEFAULT 0,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+);
+
+CREATE TABLE IF NOT EXISTS flash_sales (
+    id CHAR(36) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    product_id CHAR(36) NOT NULL,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS flash_sale_items (
+    id CHAR(36) PRIMARY KEY,
+    flash_sale_id CHAR(36) NOT NULL,
+    product_id CHAR(36) NOT NULL,
+    product_variant_id CHAR(36) NOT NULL,
+    sale_price DECIMAL(10,0) NOT NULL,
+    discount_percent DECIMAL(5,2),
+    quantity INT DEFAULT 0,
+    note TEXT,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (flash_sale_id) REFERENCES flash_sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_variant_id) REFERENCES product_variants(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36),
+    message TEXT NOT NULL,
+    image_url VARCHAR(255),
+    sender ENUM('user', 'admin') DEFAULT 'user',
+    is_read BOOLEAN DEFAULT false,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_otp_logs (
+    id CHAR(36) PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    otp VARCHAR(6) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used BOOLEAN DEFAULT false,
+    used_at DATETIME,
+    created_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
