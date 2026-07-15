@@ -5,7 +5,7 @@ import { FlashSaleItem } from '../../shared/schemas/entities/flash-sale-item.ent
 import { FlashSaleService } from './flash-sale.service';
 import { FlashSaleController } from './flash-sale.controller';
 import { Product } from '../../shared/schemas/entities/product.entity';
-import { ProductVariant } from 'src/shared/schemas/entities/product-variant.entity';
+import { ProductVariant } from '../../shared/schemas/entities/product-variant.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([FlashSale, FlashSaleItem,Product,ProductVariant])],

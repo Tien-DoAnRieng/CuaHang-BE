@@ -59,6 +59,7 @@ export class ProductService {
       hasVariants: dto.hasVariants ?? false,
       categoryId: categoryEntity?.id,
       brandId: brandEntity?.id,
+      stock: dto.stock ?? 0,
       image: dto.imageUrl || '', // Lưu imageUrl vào field image
       sellerId: sellerId || undefined, // Lưu sellerId nếu có (dùng undefined thay vì null)
     });
@@ -145,6 +146,7 @@ export class ProductService {
     categoryId: categoryEntity?.id ?? product.categoryId,
     brandId: brandEntity?.id ?? product.brandId,
     brand: dto.brand || brandEntity?.name || product.brand, // Giữ lại brand string
+    stock: dto.stock !== undefined ? dto.stock : (product.stock ?? 0),
   };
 
   // Thêm image nếu có imageUrl
@@ -399,7 +401,7 @@ async getStock(productId: string): Promise<number> {
   if (product.hasVariants && product.variants?.length) {
     return product.variants.reduce((sum, v) => sum + (v.stockQuantity ?? 0), 0);
   }
-  return 0;
+  return product.stock ?? 0;
 }
 async findAllWithRelations(query: any) {
   const qb = this.productRepository.createQueryBuilder('product')
