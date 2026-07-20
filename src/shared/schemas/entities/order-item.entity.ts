@@ -13,7 +13,7 @@ export class OrderItem {
   @Column()
   quantity: number;
 
-  @Column({ name: 'price_at_time', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ name: 'price_at_time', type: 'decimal', precision: 15, scale: 2 })
   priceAtTime: number;
 
   @ManyToOne(() => Order)
