@@ -19,7 +19,7 @@ export class ProductVariant extends BaseEntity {
   stockQuantity: number;
 
 
-  @Column({ name: 'price_override', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ name: 'price_override', type: 'decimal', precision: 15, scale: 2, nullable: true })
 
   priceOverride: number;
 

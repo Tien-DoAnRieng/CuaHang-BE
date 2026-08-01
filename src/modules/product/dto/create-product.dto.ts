@@ -32,6 +32,7 @@ export class CreateProductDto {
   @IsString() category: string;
   @IsOptional() status?: string;
   @IsBoolean() @IsOptional() hasVariants?: boolean;
+  @IsNumber() @IsOptional() stock?: number; // Thêm stock
   @IsString() @IsOptional() imageUrl?: string; // Thêm imageUrl
   @IsArray() @ValidateNested({ each: true }) @Type(() => VariantDto) @IsOptional()
   variants?: VariantDto[];

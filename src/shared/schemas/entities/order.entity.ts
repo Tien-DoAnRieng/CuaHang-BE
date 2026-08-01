@@ -10,7 +10,7 @@ export class Order extends BaseEntity {
   @Column({ name: 'user_id' })
   userId: string;
 
-  @Column({ name: 'total_amount', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ name: 'total_amount', type: 'decimal', precision: 15, scale: 2 })
   totalAmount: number;
 
   @Column()

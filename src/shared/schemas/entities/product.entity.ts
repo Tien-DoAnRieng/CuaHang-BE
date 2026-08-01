@@ -16,10 +16,10 @@ export class Product extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 15, scale: 2 })
   price: number;
 
-  @Column({ name: 'cost_price', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ name: 'cost_price', type: 'decimal', precision: 15, scale: 2, nullable: true })
   costPrice: number;
 
   @Column({ nullable: true })
@@ -36,6 +36,9 @@ export class Product extends BaseEntity {
 
   @Column({ default: false })
   hasVariants: boolean;
+
+  @Column({ default: 0 })
+  stock: number;
 
   @Column({ type: 'text', nullable: true })
   image: string; // Thêm field image để lưu URL ảnh chính
