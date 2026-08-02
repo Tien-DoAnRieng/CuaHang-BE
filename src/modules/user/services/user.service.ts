@@ -29,6 +29,7 @@ export class UserService {
 
     const [data, total] = await this.usersRepository.findAndCount({
       where,
+      relations: ['memberType', 'role'],
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
@@ -38,7 +39,10 @@ export class UserService {
   }
 
   async findOne(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.usersRepository.findOne({
+      where: { id },
+      relations: ['memberType', 'role'],
+    });
   }
  async findRoleByName(name: string): Promise<Role | null> {                              
     return this.rolesRepository.findOneBy({ name });

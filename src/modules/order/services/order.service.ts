@@ -15,6 +15,9 @@ import { QueueService } from '../../queue/queue.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { CouponService } from '../../coupon/coupon.service';
 import { CartService } from '../../cart/cart.service';
+import { MembershipService } from '../../member-type/membership.service';
+import { Coupon } from '../../../shared/schemas/entities/coupon.entity';
+import { UserVoucher } from '../../../shared/schemas/entities/user-voucher.entity';
 
 @Injectable()
 export class OrderService {
@@ -39,6 +42,7 @@ export class OrderService {
     private readonly mailerService: MailerService,
     private readonly couponService: CouponService,
     private readonly cartService: CartService,
+    private readonly membershipService: MembershipService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -120,7 +124,19 @@ export class OrderService {
       }
     }
 
-    const expectedTotal = computedTotal - discount;
+    // Xử lý hoàn tiền / cashback discount nếu có
+    let cashbackDiscount = 0;
+    if (dto.useCashbackAmount && dto.useCashbackAmount > 0) {
+      const userBalance = Number(user.cashbackBalance || 0);
+      if (dto.useCashbackAmount > userBalance) {
+        throw new BadRequestException(
+          `Số dư hoàn tiền không đủ (Hiện có: ${userBalance.toLocaleString('vi-VN')}đ, Yêu cầu: ${dto.useCashbackAmount.toLocaleString('vi-VN')}đ)`,
+        );
+      }
+      cashbackDiscount = Math.min(dto.useCashbackAmount, Math.max(0, computedTotal - discount));
+    }
+
+    const expectedTotal = Math.max(0, computedTotal - discount - cashbackDiscount);
     const providedCents = Math.round(Number(dto.totalAmount) * 100);
     const expectedCents = Math.round(expectedTotal * 100);
     
@@ -142,6 +158,7 @@ export class OrderService {
         providedCents,
         computed: computedTotal,
         discount,
+        cashbackDiscount,
         expectedTotal,
         expectedCents,
         couponCode: dto.couponCode,
@@ -157,7 +174,7 @@ export class OrderService {
 
       const orderEntity = orderRepo.create({
         userId,
-        totalAmount: expectedTotal, // Lưu tổng sau khi trừ discount
+        totalAmount: expectedTotal, // Lưu tổng sau khi trừ discount & cashback
         status: OrderStatus.PENDING,
         paymentMethod: dto.paymentMethod,
         shippingAddressId: dto.shippingAddressId,
@@ -183,8 +200,40 @@ export class OrderService {
       }
 
       await itemRepo.save(itemsToSave as OrderItem[]);
+
+      // Update coupon usedCount and user voucher usage if code is provided
+      if (dto.couponCode) {
+        const couponRepo = manager.getRepository(Coupon);
+        const userVoucherRepo = manager.getRepository(UserVoucher);
+
+        const coupon = await couponRepo.findOne({ where: { code: dto.couponCode.toUpperCase() } });
+        if (coupon) {
+          coupon.usedCount = (coupon.usedCount || 0) + 1;
+          await couponRepo.save(coupon);
+
+          const userVoucher = await userVoucherRepo.findOne({
+            where: { coupon: { id: coupon.id }, user: { id: userId } }
+          });
+          if (userVoucher) {
+            userVoucher.isUsed = true;
+            userVoucher.usedAt = new Date();
+            await userVoucherRepo.save(userVoucher);
+          }
+        }
+      }
+
       return savedOrder;
     });
+
+    // Trừ số dư cashback của người dùng nếu có áp dụng
+    if (cashbackDiscount > 0) {
+      try {
+        await this.membershipService.spendCashback(userId, cashbackDiscount, saved.id);
+      } catch (error: any) {
+        this.logger.error(`Failed to deduct cashback for order ${saved.id}:`, error?.message || error);
+        throw error;
+      }
+    }
 
     // Xóa chỉ các sản phẩm đã đặt hàng khỏi giỏ hàng (không xóa toàn bộ)
     try {
@@ -264,6 +313,14 @@ export class OrderService {
       order.status = OrderStatus.CANCELLED;
       await orderRepo.save(order);
     });
+
+    // Hoàn lại tiền cashback đã sử dụng và thu hồi cashback tích lũy nếu có
+    try {
+      await this.membershipService.refundSpentCashback(order.userId, order.id);
+      await this.membershipService.revokeOrderCashback(order.id);
+    } catch (err: any) {
+      this.logger.error(`Failed to handle cashback refund/revoke for cancelled order ${id}:`, err?.message || err);
+    }
 
     return this.orderRepository.findOne({ where: { id }, relations: ['items'] }) as Promise<Order>;
   }
@@ -348,14 +405,14 @@ export class OrderService {
     });
     if (!order) return null;
     const allowed: Record<string, string[]> = {
-      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.PAID],
+      [OrderStatus.PENDING]:    [OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.PAID],
       [OrderStatus.PROCESSING]: [OrderStatus.PAID, OrderStatus.SHIPPED, OrderStatus.CANCELLED],
-      [OrderStatus.PAID]: [OrderStatus.SHIPPED, OrderStatus.REFUNDED],
-      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
-      [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED],
-      [OrderStatus.COMPLETED]: [],
-      [OrderStatus.CANCELLED]: [],
-      [OrderStatus.REFUNDED]: [],
+      [OrderStatus.PAID]:       [OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.REFUNDED], // Admin có thể skip bước
+      [OrderStatus.SHIPPED]:    [OrderStatus.DELIVERED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],                     // Admin có thể skip DELIVERED
+      [OrderStatus.DELIVERED]:  [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
+      [OrderStatus.COMPLETED]:  [],
+      [OrderStatus.CANCELLED]:  [],
+      [OrderStatus.REFUNDED]:   [],
     };
     const allowedNext = allowed[order.status] || [];
     if (!allowedNext.includes(status)) throw new BadRequestException('Invalid status transition');
@@ -428,6 +485,26 @@ export class OrderService {
       }
     } else {
       this.logger.debug(`ℹ️ Order ${id} status unchanged (${status}), skipping email`);
+    }
+
+    // Xử lý Cập nhật Hạng Thành viên & Hoàn tiền Cashback khi Đơn hàng HOÀN THÀNH
+    if (status === OrderStatus.COMPLETED) {
+      try {
+        await this.membershipService.recalculateUserTier(saved.userId);
+        await this.membershipService.processOrderCashback(saved);
+      } catch (err: any) {
+        this.logger.error(`❌ [updateStatus] Failed to process membership tier/cashback for order ${id}:`, err?.message || err);
+      }
+    } else if (status === OrderStatus.CANCELLED || status === OrderStatus.REFUNDED) {
+      try {
+        await this.membershipService.refundSpentCashback(saved.userId, saved.id);
+        await this.membershipService.revokeOrderCashback(saved.id);
+        if (oldStatus === OrderStatus.COMPLETED) {
+          await this.membershipService.recalculateUserTier(saved.userId);
+        }
+      } catch (err: any) {
+        this.logger.error(`❌ [updateStatus] Failed to process cashback/tier on cancellation/refund for order ${id}:`, err?.message || err);
+      }
     }
 
     return saved;

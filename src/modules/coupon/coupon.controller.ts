@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto, UpdateCouponDto } from './dto/coupon.dto';
@@ -47,9 +47,22 @@ export class CouponController {
   async validate(
     @Param('code') code: string,
     @Query('orderAmount') orderAmount?: string,
+    @Req() req?: any,
   ): Promise<Coupon> {
     const amount = orderAmount ? parseFloat(orderAmount) : undefined;
-    return this.couponService.validateCoupon(code, undefined, amount);
+    let userId: string | undefined;
+    const authHeader = req?.headers?.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf-8'));
+          userId = decoded?.sub || decoded?.id;
+        }
+      } catch (e) {}
+    }
+    return this.couponService.validateCoupon(code, userId, amount);
   }
 
   @Public()

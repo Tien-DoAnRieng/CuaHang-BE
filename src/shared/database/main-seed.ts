@@ -18,6 +18,9 @@ import { FlashSaleItem } from '../schemas/entities/flash-sale-item.entity';
 import { RoleEnum } from '../../common/enums/role.enum';
 import { MemberType } from '../schemas/entities/member-type.entity';
 import { Brand } from '../schemas/entities/brand.entity';
+import { MembershipHistory } from '../schemas/entities/membership-history.entity';
+import { CashbackTransaction } from '../schemas/entities/cashback-transaction.entity';
+import { UserVoucher } from '../schemas/entities/user-voucher.entity';
 
 const get = (key: string, defaultValue?: string) =>
   process.env[key] ?? defaultValue ?? '';
@@ -52,7 +55,7 @@ const AppDataSource = new DataSource({
   entities: [
     User, Role, Color, Size, ColorSize, Category, Product, ProductVariant,
     ProductImage, Address, Order, OrderItem, Payment, FlashSale, FlashSaleItem,
-    MemberType, Brand,
+    MemberType, Brand, MembershipHistory, CashbackTransaction, UserVoucher,
   ],
   synchronize: true,
   logging: false,
@@ -76,10 +79,30 @@ async function runSeed() {
   const paymentRepo = AppDataSource.getRepository(Payment);
   const flashSaleRepo = AppDataSource.getRepository(FlashSale);
   const flashSaleItemRepo = AppDataSource.getRepository(FlashSaleItem);
-const memberTypeRepo = AppDataSource.getRepository(MemberType);
-const brandRepo = AppDataSource.getRepository(Brand);
+  const memberTypeRepo = AppDataSource.getRepository(MemberType);
+  const brandRepo = AppDataSource.getRepository(Brand);
   const customerRole = await roleRepo.findOneBy({ name: RoleEnum.CUSTOMER });
   if (!customerRole) throw new Error(`Role '${RoleEnum.CUSTOMER}' chưa tồn tại trong DB!`);
+
+  // Seed Option B Member Types
+  const memberTypesData = [
+    { name: 'Thành viên Đồng', code: 'MEMBER', rankLevel: 1, minOrders: 0, minSpent: 0, cashbackRate: 1.0, discountPercent: 0, description: 'Hạng khởi đầu cho khách hàng mới' },
+    { name: 'Thành viên Bạc', code: 'SILVER', rankLevel: 2, minOrders: 3, minSpent: 2000000, cashbackRate: 2.0, discountPercent: 2, description: 'Hạng Bạc dành cho khách hàng thân thiết' },
+    { name: 'Thành viên Vàng', code: 'GOLD', rankLevel: 3, minOrders: 10, minSpent: 5000000, cashbackRate: 3.0, discountPercent: 5, description: 'Hạng Vàng với ưu đãi hoàn tiền 3% và hỗ trợ ưu tiên' },
+    { name: 'Thành viên Bạch Kim', code: 'PLATINUM', rankLevel: 4, minOrders: 25, minSpent: 15000000, cashbackRate: 4.0, discountPercent: 7, description: 'Hạng Bạch Kim dành cho VIP' },
+    { name: 'Thành viên Kim Cương', code: 'DIAMOND', rankLevel: 5, minOrders: 50, minSpent: 30000000, cashbackRate: 5.0, discountPercent: 10, description: 'Hạng Kim Cương cao cấp nhất với đặc quyền VIP' },
+  ];
+
+  const seededMemberTypes: MemberType[] = [];
+  for (const mtData of memberTypesData) {
+    let existing = await memberTypeRepo.findOne({ where: { code: mtData.code } });
+    if (!existing) {
+      existing = memberTypeRepo.create(mtData);
+      existing = await memberTypeRepo.save(existing);
+    }
+    seededMemberTypes.push(existing);
+  }
+  const defaultMemberType = seededMemberTypes.find(mt => mt.code === 'MEMBER') || seededMemberTypes[0];
 
   // Colors
   const colorsData = [
@@ -101,9 +124,11 @@ const brandRepo = AppDataSource.getRepository(Brand);
       passwordHash: faker.internet.password(),
       isVerified: true,
       role: customerRole,
+      memberType: defaultMemberType,
     });
     users.push(await userRepo.save(user));
   }
+
 
   // Addresses
   const addresses: Address[] = [];
