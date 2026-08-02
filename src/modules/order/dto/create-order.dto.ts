@@ -32,4 +32,10 @@ export class CreateOrderDto {
   @IsString()
   @ApiProperty({ example: 'SALE', required: false })
   couponCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @ApiProperty({ example: 50000, required: false })
+  useCashbackAmount?: number;
 }
+

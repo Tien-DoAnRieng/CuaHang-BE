@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Coupon } from '../../shared/schemas/entities/coupon.entity';
+import { UserVoucher } from '../../shared/schemas/entities/user-voucher.entity';
 import { CreateCouponDto, UpdateCouponDto } from './dto/coupon.dto';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class CouponService {
   constructor(
     @InjectRepository(Coupon)
     private couponRepository: Repository<Coupon>,
+    @InjectRepository(UserVoucher)
+    private userVoucherRepository: Repository<UserVoucher>,
   ) {}
 
   async create(createDto: CreateCouponDto): Promise<Coupon> {
@@ -135,6 +138,27 @@ export class CouponService {
     }
     if (coupon.endDate && now > coupon.endDate) {
       throw new BadRequestException('Mã giảm giá đã hết hạn.');
+    }
+
+    // Kiểm tra xem coupon có phải là voucher cá nhân không
+    const userVoucher = await this.userVoucherRepository.findOne({
+      where: { coupon: { id: coupon.id } },
+      relations: ['user'],
+    });
+
+    if (userVoucher) {
+      if (!userId) {
+        throw new BadRequestException('Mã giảm giá cá nhân. Vui lòng đăng nhập để sử dụng.');
+      }
+      if (userVoucher.user.id !== userId) {
+        throw new BadRequestException('Mã giảm giá này không thuộc sở hữu của bạn.');
+      }
+      if (userVoucher.isUsed) {
+        throw new BadRequestException('Mã giảm giá này đã được sử dụng.');
+      }
+      if (userVoucher.expiresAt && now > userVoucher.expiresAt) {
+        throw new BadRequestException('Mã giảm giá đã hết hạn.');
+      }
     }
 
     // Kiểm tra giới hạn sử dụng

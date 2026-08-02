@@ -16,6 +16,7 @@ import { QueueModule } from '../queue/queue.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { CouponModule } from '../coupon/coupon.module';
 import { CartModule } from '../cart/cart.module';
+import { MemberTypeModule } from '../member-type/member-type.module'; // ✅ Cần cho MembershipService
 import { join } from 'path';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 
@@ -25,6 +26,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
     QueueModule,
     CouponModule,
     CartModule,
+    MemberTypeModule, // ✅ Fix: Cần thiết cho MembershipService trong OrderService
     MailerModule.forRoot({
       transport: {
         host: process.env.MAIL_HOST || 'smtp.gmail.com',
