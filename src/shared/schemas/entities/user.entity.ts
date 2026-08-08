@@ -57,6 +57,9 @@ export class User extends BaseEntity {
   @Column({ type: 'date', name: 'date_of_birth', nullable: true })
   dateOfBirth: Date | null;
 
+  @Column({ name: 'is_bot_muted', type: 'boolean', default: false })
+  isBotMuted: boolean;
+
   constructor(partial?: Partial<User>) {
     super();
     Object.assign(this, partial);
