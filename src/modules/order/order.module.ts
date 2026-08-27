@@ -14,6 +14,7 @@ import { CartModule } from '../cart/cart.module';
 import { MemberTypeModule } from '../member-type/member-type.module';
 import { OrderController } from './controllers/order.controller';
 import { OrderService } from './services/order.service';
+import { GhnModule } from '../ghn/ghn.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { OrderService } from './services/order.service';
     CouponModule, // Import CouponModule để sử dụng CouponService
     CartModule,   // ✅ Cần thiết cho CartService injection trong OrderService
     MemberTypeModule, // Import MemberTypeModule để sử dụng MembershipService
+    GhnModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

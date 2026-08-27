@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger, BadGatewayException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Order } from '../../../shared/schemas/entities/order.entity';
@@ -18,6 +18,7 @@ import { CartService } from '../../cart/cart.service';
 import { MembershipService } from '../../member-type/membership.service';
 import { Coupon } from '../../../shared/schemas/entities/coupon.entity';
 import { UserVoucher } from '../../../shared/schemas/entities/user-voucher.entity';
+import { GhnService } from '../../ghn/ghn.service';
 
 @Injectable()
 export class OrderService {
@@ -43,6 +44,7 @@ export class OrderService {
     private readonly couponService: CouponService,
     private readonly cartService: CartService,
     private readonly membershipService: MembershipService,
+    private readonly ghnService: GhnService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -119,7 +121,7 @@ export class OrderService {
         // Discount cannot exceed order amount
         discount = Math.min(discount, computedTotal);
       } catch (error) {
-        this.logger.warn(`Invalid coupon code: ${dto.couponCode}`, error.message);
+        this.logger.warn(`Invalid coupon code: ${dto.couponCode}`, (error as any)?.message);
         // Continue without discount if coupon is invalid
       }
     }
@@ -136,7 +138,8 @@ export class OrderService {
       cashbackDiscount = Math.min(dto.useCashbackAmount, Math.max(0, computedTotal - discount));
     }
 
-    const expectedTotal = Math.max(0, computedTotal - discount - cashbackDiscount);
+    const shippingFee = Math.max(0, Number(dto.shippingFee || 0));
+    const expectedTotal = Math.max(0, computedTotal - discount - cashbackDiscount + shippingFee);
     const providedCents = Math.round(Number(dto.totalAmount) * 100);
     const expectedCents = Math.round(expectedTotal * 100);
     
@@ -178,6 +181,9 @@ export class OrderService {
         status: OrderStatus.PENDING,
         paymentMethod: dto.paymentMethod,
         shippingAddressId: dto.shippingAddressId,
+        shippingFee,
+        ghnOrderCode: null,
+        ghnStatus: null,
       } as Partial<Order>);
 
       const savedOrder = await orderRepo.save(orderEntity);
@@ -242,7 +248,7 @@ export class OrderService {
       }
       this.logger.log(`Removed ${dto.items.length} items from cart for user ${userId} after successful order`);
     } catch (error) {
-      this.logger.warn(`Failed to remove items from cart for user ${userId}:`, error.message);
+      this.logger.warn(`Failed to remove items from cart for user ${userId}:`, (error as any)?.message);
       // Không throw error vì order đã tạo thành công
     }
 
@@ -289,6 +295,84 @@ export class OrderService {
     }
 
     return orderWithItems;
+  }
+
+  async createGhnShipment(orderId: string): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: ['items', 'items.variant', 'items.variant.product', 'shippingAddress'],
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.ghnOrderCode) throw new BadRequestException('GHN shipment already created');
+    if ([OrderStatus.CANCELLED, OrderStatus.REFUNDED, OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status as OrderStatus)) {
+      throw new BadRequestException('Order is not eligible for GHN shipment');
+    }
+
+    const address = order.shippingAddress;
+    if (!address) throw new BadRequestException('Shipping address not found');
+
+    const fromName = process.env.GHN_FROM_NAME?.trim() || 'Shop';
+    const fromPhone = process.env.GHN_FROM_PHONE?.trim() || address.phone;
+    const fromAddress = process.env.GHN_FROM_ADDRESS?.trim() || address.fullAddress;
+    const fromWardName = process.env.GHN_FROM_WARD_NAME?.trim() || address.ward;
+    const fromDistrictName = process.env.GHN_FROM_DISTRICT_NAME?.trim() || address.district;
+    const fromProvinceName = process.env.GHN_FROM_PROVINCE_NAME?.trim() || address.province;
+
+    if (!process.env.GHN_FROM_DISTRICT_ID || !process.env.GHN_FROM_WARD_CODE) {
+      throw new BadGatewayException(
+        'GHN shop address is not configured. Please set GHN_FROM_DISTRICT_ID and GHN_FROM_WARD_CODE in backend/.env.',
+      );
+    }
+
+    const defaultWeight = Number(process.env.GHN_DEFAULT_WEIGHT || 500);
+    const targetLocation = await this.ghnService.resolveShippingLocation(address.province, address.district, address.ward);
+    const paymentMethod = String(order.paymentMethod || '').toUpperCase();
+    const orderStatus = String(order.status || '').toUpperCase();
+    const isPaidOrder = orderStatus === OrderStatus.PAID || orderStatus === OrderStatus.SHIPPED || orderStatus === OrderStatus.DELIVERED || orderStatus === OrderStatus.COMPLETED;
+    const isCashOnDelivery = paymentMethod === 'COD';
+    const codAmount = isPaidOrder ? 0 : isCashOnDelivery ? Number(order.totalAmount) : 0;
+
+    const ghnOrder = await this.ghnService.createOrder({
+      shop_id: Number(process.env.GHN_SHOP_ID),
+      payment_type_id: 2,
+      note: `Order ${order.id}`,
+      required_note: 'KHONGCHOXEMHANG',
+      from_name: fromName,
+      from_phone: fromPhone,
+      from_address: fromAddress,
+      from_ward_code: process.env.GHN_FROM_WARD_CODE?.trim(),
+      from_district_id: Number(process.env.GHN_FROM_DISTRICT_ID),
+      from_ward_name: fromWardName,
+      from_district_name: fromDistrictName,
+      from_province_name: fromProvinceName,
+      to_name: address.recipientName,
+      to_phone: address.phone,
+      to_address: address.fullAddress,
+      to_ward_code: targetLocation.wardCode,
+      to_district_id: targetLocation.districtId,
+      to_ward_name: targetLocation.wardName,
+      to_district_name: targetLocation.districtName,
+      to_province_name: targetLocation.provinceName,
+      cod_amount: codAmount,
+      content: `Order ${order.id}`,
+      weight: defaultWeight,
+      length: Number(process.env.GHN_DEFAULT_LENGTH || 20),
+      width: Number(process.env.GHN_DEFAULT_WIDTH || 15),
+      height: Number(process.env.GHN_DEFAULT_HEIGHT || 10),
+      service_type_id: 2,
+      insurance_value: Math.min(Number(order.totalAmount), 5000000),
+      items: order.items.map((item) => ({
+        name: item.variant?.product?.name || `Product ${item.variantId}`,
+        code: item.variantId,
+        quantity: item.quantity,
+        price: Number(item.priceAtTime),
+        weight: defaultWeight,
+      })),
+    });
+
+    order.ghnOrderCode = ghnOrder.order_code || null;
+    order.ghnStatus = order.ghnOrderCode ? 'READY_TO_PICK' : 'FAILED';
+    return this.orderRepository.save(order);
   }
 
   async cancelOrder(id: string, userId: string, isAdmin = false): Promise<Order> {

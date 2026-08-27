@@ -22,6 +22,15 @@ export class Order extends BaseEntity {
   @Column({ name: 'shipping_address_id' })
   shippingAddressId: string;
 
+  @Column({ name: 'shipping_fee', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  shippingFee: number;
+
+  @Column({ name: 'ghn_order_code', type: 'varchar', length: 100, nullable: true })
+  ghnOrderCode: string | null;
+
+  @Column({ name: 'ghn_status', type: 'varchar', length: 50, nullable: true })
+  ghnStatus: string | null;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;

@@ -32,6 +32,9 @@ export class ChatMessage {
   @Column({ type: 'boolean', default: false })
   isRead: boolean;
 
+  @Column({ type: 'boolean', default: false, name: 'is_ai' })
+  isAi: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
