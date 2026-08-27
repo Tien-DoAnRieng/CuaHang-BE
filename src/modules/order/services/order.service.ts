@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger, BadGatewayException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Order } from '../../../shared/schemas/entities/order.entity';
@@ -310,25 +310,50 @@ export class OrderService {
 
     const address = order.shippingAddress;
     if (!address) throw new BadRequestException('Shipping address not found');
+
+    const fromName = process.env.GHN_FROM_NAME?.trim() || 'Shop';
+    const fromPhone = process.env.GHN_FROM_PHONE?.trim() || address.phone;
+    const fromAddress = process.env.GHN_FROM_ADDRESS?.trim() || address.fullAddress;
+    const fromWardName = process.env.GHN_FROM_WARD_NAME?.trim() || address.ward;
+    const fromDistrictName = process.env.GHN_FROM_DISTRICT_NAME?.trim() || address.district;
+    const fromProvinceName = process.env.GHN_FROM_PROVINCE_NAME?.trim() || address.province;
+
+    if (!process.env.GHN_FROM_DISTRICT_ID || !process.env.GHN_FROM_WARD_CODE) {
+      throw new BadGatewayException(
+        'GHN shop address is not configured. Please set GHN_FROM_DISTRICT_ID and GHN_FROM_WARD_CODE in backend/.env.',
+      );
+    }
+
     const defaultWeight = Number(process.env.GHN_DEFAULT_WEIGHT || 500);
+    const targetLocation = await this.ghnService.resolveShippingLocation(address.province, address.district, address.ward);
+    const paymentMethod = String(order.paymentMethod || '').toUpperCase();
+    const orderStatus = String(order.status || '').toUpperCase();
+    const isPaidOrder = orderStatus === OrderStatus.PAID || orderStatus === OrderStatus.SHIPPED || orderStatus === OrderStatus.DELIVERED || orderStatus === OrderStatus.COMPLETED;
+    const isCashOnDelivery = paymentMethod === 'COD';
+    const codAmount = isPaidOrder ? 0 : isCashOnDelivery ? Number(order.totalAmount) : 0;
+
     const ghnOrder = await this.ghnService.createOrder({
       shop_id: Number(process.env.GHN_SHOP_ID),
-      payment_type_id: order.paymentMethod.toUpperCase() === 'COD' ? 2 : 1,
+      payment_type_id: 2,
       note: `Order ${order.id}`,
       required_note: 'KHONGCHOXEMHANG',
-      from_name: process.env.GHN_FROM_NAME || 'Shop',
-      from_phone: process.env.GHN_FROM_PHONE || address.phone,
-      from_address: process.env.GHN_FROM_ADDRESS || address.fullAddress,
-      from_ward_name: process.env.GHN_FROM_WARD_NAME || address.ward,
-      from_district_name: process.env.GHN_FROM_DISTRICT_NAME || address.district,
-      from_province_name: process.env.GHN_FROM_PROVINCE_NAME || address.province,
+      from_name: fromName,
+      from_phone: fromPhone,
+      from_address: fromAddress,
+      from_ward_code: process.env.GHN_FROM_WARD_CODE?.trim(),
+      from_district_id: Number(process.env.GHN_FROM_DISTRICT_ID),
+      from_ward_name: fromWardName,
+      from_district_name: fromDistrictName,
+      from_province_name: fromProvinceName,
       to_name: address.recipientName,
       to_phone: address.phone,
       to_address: address.fullAddress,
-      to_ward_name: address.ward,
-      to_district_name: address.district,
-      to_province_name: address.province,
-      cod_amount: order.paymentMethod.toUpperCase() === 'COD' ? Number(order.totalAmount) : 0,
+      to_ward_code: targetLocation.wardCode,
+      to_district_id: targetLocation.districtId,
+      to_ward_name: targetLocation.wardName,
+      to_district_name: targetLocation.districtName,
+      to_province_name: targetLocation.provinceName,
+      cod_amount: codAmount,
       content: `Order ${order.id}`,
       weight: defaultWeight,
       length: Number(process.env.GHN_DEFAULT_LENGTH || 20),

@@ -15,8 +15,15 @@ export class GhnService {
   ) {
     this.baseUrl = (this.configService.get<string>('GHN_BASE_URL') ||
       'https://online-gateway.ghn.vn/shiip/public-api').replace(/\/$/, '');
-    this.token = this.configService.getOrThrow<string>('GHN_TOKEN');
-    this.shopId = Number(this.configService.getOrThrow<string>('GHN_SHOP_ID'));
+    this.token = String(this.configService.get<string>('GHN_TOKEN') || '').trim();
+    this.shopId = Number(String(this.configService.get<string>('GHN_SHOP_ID') || '').trim());
+
+    if (!this.token) {
+      throw new Error('GHN_TOKEN is missing or empty');
+    }
+    if (!this.shopId || Number.isNaN(this.shopId)) {
+      throw new Error('GHN_SHOP_ID is missing or invalid');
+    }
   }
 
   async getProvinces() {
@@ -75,6 +82,29 @@ export class GhnService {
     return { ...fee, toDistrictId: district.DistrictID, toWardCode: ward.WardCode };
   }
 
+  async resolveShippingLocation(provinceName: string, districtName: string, wardName: string) {
+    const provinces: any[] = await this.getProvinces();
+    const province = this.findByName(provinces, provinceName);
+    if (!province) throw new BadGatewayException(`GHN province not found: ${provinceName}`);
+
+    const districts: any[] = await this.getDistricts(province.ProvinceID);
+    const district = this.findByName(districts, districtName);
+    if (!district) throw new BadGatewayException(`GHN district not found: ${districtName}`);
+
+    const wards: any[] = await this.getWards(district.DistrictID);
+    const ward = this.findByName(wards, wardName);
+    if (!ward) throw new BadGatewayException(`GHN ward not found: ${wardName}`);
+
+    return {
+      provinceId: province.ProvinceID,
+      provinceName: province.ProvinceName,
+      districtId: district.DistrictID,
+      districtName: district.DistrictName,
+      wardCode: ward.WardCode,
+      wardName: ward.WardName,
+    };
+  }
+
   async createOrder(payload: Record<string, unknown>) {
     return this.request('/v2/shipping-order/create', 'post', payload);
   }
@@ -104,12 +134,18 @@ export class GhnService {
           });
 
       if (response.data?.code !== 200) {
-        throw new Error(response.data?.message || 'GHN request failed');
+        const ghnMessage = response.data?.message || response.data?.error || 'GHN request failed';
+        throw new Error(ghnMessage);
       }
 
       return response.data.data;
     } catch (error: any) {
-      throw new BadGatewayException(`GHN request failed: ${error?.message || 'unknown error'}`);
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'unknown error';
+      throw new BadGatewayException(`GHN request failed: ${message}`);
     }
   }
 }
