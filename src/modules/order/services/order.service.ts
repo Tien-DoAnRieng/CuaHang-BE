@@ -18,6 +18,7 @@ import { CartService } from '../../cart/cart.service';
 import { MembershipService } from '../../member-type/membership.service';
 import { Coupon } from '../../../shared/schemas/entities/coupon.entity';
 import { UserVoucher } from '../../../shared/schemas/entities/user-voucher.entity';
+import { GhnService } from '../../ghn/ghn.service';
 
 @Injectable()
 export class OrderService {
@@ -43,6 +44,7 @@ export class OrderService {
     private readonly couponService: CouponService,
     private readonly cartService: CartService,
     private readonly membershipService: MembershipService,
+    private readonly ghnService: GhnService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -119,7 +121,7 @@ export class OrderService {
         // Discount cannot exceed order amount
         discount = Math.min(discount, computedTotal);
       } catch (error) {
-        this.logger.warn(`Invalid coupon code: ${dto.couponCode}`, error.message);
+        this.logger.warn(`Invalid coupon code: ${dto.couponCode}`, (error as any)?.message);
         // Continue without discount if coupon is invalid
       }
     }
@@ -136,7 +138,8 @@ export class OrderService {
       cashbackDiscount = Math.min(dto.useCashbackAmount, Math.max(0, computedTotal - discount));
     }
 
-    const expectedTotal = Math.max(0, computedTotal - discount - cashbackDiscount);
+    const shippingFee = Math.max(0, Number(dto.shippingFee || 0));
+    const expectedTotal = Math.max(0, computedTotal - discount - cashbackDiscount + shippingFee);
     const providedCents = Math.round(Number(dto.totalAmount) * 100);
     const expectedCents = Math.round(expectedTotal * 100);
     
@@ -178,6 +181,9 @@ export class OrderService {
         status: OrderStatus.PENDING,
         paymentMethod: dto.paymentMethod,
         shippingAddressId: dto.shippingAddressId,
+        shippingFee,
+        ghnOrderCode: null,
+        ghnStatus: null,
       } as Partial<Order>);
 
       const savedOrder = await orderRepo.save(orderEntity);
@@ -242,7 +248,7 @@ export class OrderService {
       }
       this.logger.log(`Removed ${dto.items.length} items from cart for user ${userId} after successful order`);
     } catch (error) {
-      this.logger.warn(`Failed to remove items from cart for user ${userId}:`, error.message);
+      this.logger.warn(`Failed to remove items from cart for user ${userId}:`, (error as any)?.message);
       // Không throw error vì order đã tạo thành công
     }
 
@@ -289,6 +295,59 @@ export class OrderService {
     }
 
     return orderWithItems;
+  }
+
+  async createGhnShipment(orderId: string): Promise<Order> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId },
+      relations: ['items', 'items.variant', 'items.variant.product', 'shippingAddress'],
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.ghnOrderCode) throw new BadRequestException('GHN shipment already created');
+    if ([OrderStatus.CANCELLED, OrderStatus.REFUNDED, OrderStatus.DELIVERED, OrderStatus.COMPLETED].includes(order.status as OrderStatus)) {
+      throw new BadRequestException('Order is not eligible for GHN shipment');
+    }
+
+    const address = order.shippingAddress;
+    if (!address) throw new BadRequestException('Shipping address not found');
+    const defaultWeight = Number(process.env.GHN_DEFAULT_WEIGHT || 500);
+    const ghnOrder = await this.ghnService.createOrder({
+      shop_id: Number(process.env.GHN_SHOP_ID),
+      payment_type_id: order.paymentMethod.toUpperCase() === 'COD' ? 2 : 1,
+      note: `Order ${order.id}`,
+      required_note: 'KHONGCHOXEMHANG',
+      from_name: process.env.GHN_FROM_NAME || 'Shop',
+      from_phone: process.env.GHN_FROM_PHONE || address.phone,
+      from_address: process.env.GHN_FROM_ADDRESS || address.fullAddress,
+      from_ward_name: process.env.GHN_FROM_WARD_NAME || address.ward,
+      from_district_name: process.env.GHN_FROM_DISTRICT_NAME || address.district,
+      from_province_name: process.env.GHN_FROM_PROVINCE_NAME || address.province,
+      to_name: address.recipientName,
+      to_phone: address.phone,
+      to_address: address.fullAddress,
+      to_ward_name: address.ward,
+      to_district_name: address.district,
+      to_province_name: address.province,
+      cod_amount: order.paymentMethod.toUpperCase() === 'COD' ? Number(order.totalAmount) : 0,
+      content: `Order ${order.id}`,
+      weight: defaultWeight,
+      length: Number(process.env.GHN_DEFAULT_LENGTH || 20),
+      width: Number(process.env.GHN_DEFAULT_WIDTH || 15),
+      height: Number(process.env.GHN_DEFAULT_HEIGHT || 10),
+      service_type_id: 2,
+      insurance_value: Math.min(Number(order.totalAmount), 5000000),
+      items: order.items.map((item) => ({
+        name: item.variant?.product?.name || `Product ${item.variantId}`,
+        code: item.variantId,
+        quantity: item.quantity,
+        price: Number(item.priceAtTime),
+        weight: defaultWeight,
+      })),
+    });
+
+    order.ghnOrderCode = ghnOrder.order_code || null;
+    order.ghnStatus = order.ghnOrderCode ? 'READY_TO_PICK' : 'FAILED';
+    return this.orderRepository.save(order);
   }
 
   async cancelOrder(id: string, userId: string, isAdmin = false): Promise<Order> {

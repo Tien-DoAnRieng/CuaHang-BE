@@ -30,6 +30,7 @@ import { BrandModule } from './modules/brand/brand.module';
 import { MemberTypeModule } from './modules/member-type/member-type.module';
 import { CouponModule } from './modules/coupon/coupon.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { GhnModule } from './modules/ghn/ghn.module';
 @Module({
   imports: [
 
@@ -59,7 +60,8 @@ import { ChatModule } from './modules/chat/chat.module';
   ColorSizeModule,
   MemberTypeModule,
   CouponModule,
-  ChatModule
+  ChatModule,
+  GhnModule
   ],
   controllers: [AppController],
   providers: [AppService],

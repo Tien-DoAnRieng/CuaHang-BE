@@ -37,5 +37,10 @@ export class CreateOrderDto {
   @IsNumber()
   @ApiProperty({ example: 50000, required: false })
   useCashbackAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @ApiProperty({ example: 25000, required: false })
+  shippingFee?: number;
 }
 
