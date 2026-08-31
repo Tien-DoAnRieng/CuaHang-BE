@@ -20,6 +20,7 @@ function createTypeOrmOptions(configService: ConfigService): TypeOrmModuleOption
   
     // Cấu hình encoding và tối ưu kết nối
     charset: 'utf8mb4',
+    ssl: get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : undefined,
     extra: {
       connectionLimit: 10,
       waitForConnections: true,
