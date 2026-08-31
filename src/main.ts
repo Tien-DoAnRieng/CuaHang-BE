@@ -49,7 +49,7 @@ async function bootstrap() {
     .setDescription('API documentation for the Ecommerce project')
     .setVersion('1.0')
     .addTag('Ecommerce')
-    .addServer(process.env.APP_URL || '/')
+    .addServer('/')
     .addBearerAuth(
       {
         type: 'http',
