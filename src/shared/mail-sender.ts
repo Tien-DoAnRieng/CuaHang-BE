@@ -38,6 +38,9 @@ export class MailSender {
     try {
       this.logger.log(`📧 [Brevo HTTP] Đang gửi email đến ${options.to} (Tiêu đề: "${options.subject}")...`);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
@@ -45,6 +48,7 @@ export class MailSender {
           'api-key': brevoApiKey,
           'content-type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           sender: {
             name: senderName,
@@ -60,6 +64,7 @@ export class MailSender {
         }),
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (response.ok && data.messageId) {
