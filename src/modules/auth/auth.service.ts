@@ -20,6 +20,7 @@ import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { RoleEnum } from '../../common/enums/role.enum';
 import { UserOtpLog } from '../../shared/schemas/entities/user-otp-log.entity';
+import { MailSender } from '../../shared/mail-sender';
 
 @Injectable()
 export class AuthService implements OnApplicationBootstrap {
@@ -83,65 +84,62 @@ export class AuthService implements OnApplicationBootstrap {
     expiresAt: Date,
     retries: number = 3
   ): Promise<boolean> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h2>Xin chào ${name},</h2>
+        <p>Mã xác thực tài khoản của bạn là:</p>
+        <h1 style="color: #2563eb; letter-spacing: 4px; font-size: 32px;">${otp}</h1>
+        <p>Mã này có hiệu lực trong 10 phút.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+        <p style="color: #64748b; font-size: 14px;">Trân trọng,<br/>Đội ngũ hỗ trợ E-Commerce</p>
+      </div>
+    `;
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         this.logger.log(`📧 Attempting to send OTP email to ${email} (attempt ${attempt}/${retries})`);
         
-        // Kiểm tra cấu hình mail
-        const mailUser = process.env.MAIL_USER;
-        const mailPassword = process.env.MAIL_PASSWORD;
-        
-        if (!mailUser || !mailPassword) {
-          this.logger.error(`❌ Mail configuration missing: MAIL_USER=${!!mailUser}, MAIL_PASSWORD=${!!mailPassword}`);
-          throw new Error('Mail configuration is missing. Please set MAIL_USER and MAIL_PASSWORD in .env file');
-        }
-
-        try {
-          await this.mailerService.sendMail({
+        const success = await MailSender.sendMail(
+          {
             to: email,
             subject: 'Mã xác thực tài khoản',
+            html,
             template: 'verify-email',
             context: { name, otp },
-          });
-        } catch (tmplError) {
-          this.logger.warn(`⚠️ Template verify-email failed, using HTML fallback:`, tmplError);
-          await this.mailerService.sendMail({
-            to: email,
-            subject: 'Mã xác thực tài khoản',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <h2>Xin chào ${name},</h2>
-                <p>Mã xác thực tài khoản của bạn là:</p>
-                <h1 style="color: #2563eb; letter-spacing: 4px; font-size: 32px;">${otp}</h1>
-                <p>Mã này có hiệu lực trong 10 phút.</p>
-                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
-                <p style="color: #64748b; font-size: 14px;">Trân trọng,<br/>Đội ngũ hỗ trợ E-Commerce</p>
-              </div>
-            `,
-          });
-        }
-        
-        this.logger.log(`✅ OTP email sent successfully to ${email}`);
-        
-        // Log OTP vào database để debug (optional) - với đầy đủ thông tin
-        try {
-          const user = await this.userRepo.findOne({ where: { id: userId } });
-          if (user) {
-            await this.otpLogRepo.save({
-              user,
-              otp,
-              expiresAt,
-              used: false,
-              usedAt: null,
-            });
-            this.logger.log(`✅ OTP logged to database for ${email}`);
+          },
+          this.mailerService,
+        );
+
+        if (success) {
+          this.logger.log(`✅ OTP email sent successfully to ${email}`);
+          
+          // Log OTP vào database để debug
+          try {
+            const user = await this.userRepo.findOne({ where: { id: userId } });
+            if (user) {
+              await this.otpLogRepo.save({
+                user,
+                otp,
+                expiresAt,
+                used: false,
+                usedAt: null,
+              });
+              this.logger.log(`✅ OTP logged to database for ${email}`);
+            }
+          } catch (logError) {
+            this.logger.warn(`⚠️ Failed to log OTP to database:`, logError);
           }
-        } catch (logError) {
-          this.logger.warn(`⚠️ Failed to log OTP to database:`, logError);
-          // Không throw error vì việc log không quan trọng bằng việc gửi email
+          
+          return true;
+        }
+
+        if (attempt === retries) {
+          this.logger.error(`❌ All ${retries} attempts failed. OTP: ${otp} for ${email}`);
+          return false;
         }
         
-        return true;
+        // Đợi 1 giây trước khi retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (mailError: any) {
         this.logger.error(`❌ Failed to send OTP email to ${email} (attempt ${attempt}/${retries}):`, {
           error: mailError?.message || mailError,
@@ -149,12 +147,10 @@ export class AuthService implements OnApplicationBootstrap {
         });
         
         if (attempt === retries) {
-          // Lần cuối cùng thất bại, log chi tiết
           this.logger.error(`❌ All ${retries} attempts failed. OTP: ${otp} for ${email}`);
           return false;
         }
         
-        // Đợi 1 giây trước khi retry
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -301,30 +297,27 @@ export class AuthService implements OnApplicationBootstrap {
       this.otpLogRepo.create({ user, otp, expiresAt, used: false })
     );
 
-    // Gửi mail OTP
-    try {
-      await this.mailerService.sendMail({
+    // Gửi mail OTP (Resend HTTP API + fallback SMTP)
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <h3>Xin chào ${user.name},</h3>
+        <p>Bạn đã yêu cầu đặt lại mật khẩu. Đây là mã OTP của bạn:</p>
+        <h2 style="color: #007bff; letter-spacing: 4px; font-size: 28px;">${otp}</h2>
+        <p>Mã có hiệu lực trong 10 phút.</p>
+        <p style="color: #64748b; font-size: 13px;">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+      </div>
+    `;
+
+    await MailSender.sendMail(
+      {
         to: user.email,
         subject: 'Mã đặt lại mật khẩu',
-        template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
+        html,
+        template: 'reset-password',
         context: { name: user.name, otp },
-      });
-    } catch (tmplError) {
-      this.logger.warn(`⚠️ Template reset-password failed, using HTML fallback:`, tmplError);
-      await this.mailerService.sendMail({
-        to: user.email,
-        subject: 'Mã đặt lại mật khẩu',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h3>Xin chào ${user.name},</h3>
-            <p>Bạn đã yêu cầu đặt lại mật khẩu. Đây là mã OTP của bạn:</p>
-            <h2 style="color: #007bff; letter-spacing: 4px; font-size: 28px;">${otp}</h2>
-            <p>Mã có hiệu lực trong 10 phút.</p>
-            <p style="color: #64748b; font-size: 13px;">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-          </div>
-        `,
-      });
-    }
+      },
+      this.mailerService,
+    );
 
     return { message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn' };
   }
