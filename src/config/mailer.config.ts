@@ -32,9 +32,13 @@ export const mailerConfig: MailerAsyncOptions = {
     const secure = config.get<string>('MAIL_SECURE') === 'true' || port === 465;
     const user = config.get<string>('MAIL_USER');
     const pass = config.get<string>('MAIL_PASSWORD');
-    const from = config.get<string>('MAIL_FROM', `"E-Commerce Shop" <${user || 'noreply@ecommerce.com'}>`);
+    const from = config.get<string>('MAIL_FROM') || `"E-Commerce Shop" <${user}>`;
 
     const templateDir = findTemplateDir();
+
+    // Log cấu hình mail lúc khởi động để dễ debug trên Render
+    console.log(`[MailerConfig] host=${host} port=${port} secure=${secure} user=${user ? user.substring(0, 5) + '...' : 'MISSING'} pass=${pass ? '***SET***' : 'MISSING'} from=${from}`);
+    console.log(`[MailerConfig] templateDir=${templateDir} (exists=${fs.existsSync(templateDir)})`);
 
     return {
       transport: {
