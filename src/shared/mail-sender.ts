@@ -26,16 +26,73 @@ export class MailSender {
   }
 
   /**
-   * Gửi email ưu tiên qua Resend HTTP API (Port 443 - không bị chặn trên Render/Cloud),
-   * nếu không có Resend hoặc lỗi sẽ fallback sang MailerService (Nodemailer SMTP).
+   * Gửi email qua Brevo REST API (Port 443 HTTPS - chạy mượt mà trên Render không bị chặn cổng)
+   */
+  private static async sendViaBrevo(options: SendMailOptions): Promise<boolean> {
+    const brevoApiKey = process.env.BREVO_API_KEY;
+    if (!brevoApiKey) return false;
+
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.MAIL_USER || 'anbk27122005@gmail.com';
+    const senderName = process.env.BREVO_SENDER_NAME || 'E-Commerce Shop';
+
+    try {
+      this.logger.log(`📧 [Brevo HTTP] Đang gửi email đến ${options.to} (Tiêu đề: "${options.subject}")...`);
+
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': brevoApiKey,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: {
+            name: senderName,
+            email: senderEmail,
+          },
+          to: [
+            {
+              email: options.to,
+            },
+          ],
+          subject: options.subject,
+          htmlContent: options.html,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.messageId) {
+        this.logger.log(`✅ [Brevo HTTP] Gửi email thành công tới ${options.to}! MessageID: ${data.messageId}`);
+        return true;
+      } else {
+        this.logger.warn(`⚠️ [Brevo HTTP] Thất bại (Status ${response.status}):`, data);
+        return false;
+      }
+    } catch (err: any) {
+      this.logger.error(`❌ [Brevo HTTP] Lỗi gọi Brevo API: ${err.message}`, err);
+      return false;
+    }
+  }
+
+  /**
+   * Gửi email ưu tiên:
+   * 1. Brevo HTTP API (Port 443 - gửi được cho MỌI email)
+   * 2. Resend HTTP API (Port 443)
+   * 3. MailerService (Nodemailer SMTP)
    */
   static async sendMail(options: SendMailOptions, fallbackMailerService?: MailerService): Promise<boolean> {
-    const resend = this.getResend();
-    const from = process.env.RESEND_FROM || 'E-Commerce <onboarding@resend.dev>';
+    // 1️⃣ Ưu tiên Brevo API (Gửi được cho mọi email khách hàng, chạy trên HTTPS 443)
+    if (process.env.BREVO_API_KEY) {
+      const brevoSent = await this.sendViaBrevo(options);
+      if (brevoSent) return true;
+    }
 
-    // 1️⃣ Ưu tiên gửi qua Resend API (HTTP REST API qua cổng 443)
+    // 2️⃣ Kế tiếp thử Resend API
+    const resend = this.getResend();
     if (resend) {
       try {
+        const from = process.env.RESEND_FROM || 'E-Commerce <onboarding@resend.dev>';
         this.logger.log(`📧 [Resend HTTP] Gửi email đến: ${options.to} (Tiêu đề: "${options.subject}")`);
         const result = await resend.emails.send({
           from,
@@ -55,7 +112,7 @@ export class MailSender {
       }
     }
 
-    // 2️⃣ Fallback sang MailerService (SMTP)
+    // 3️⃣ Fallback sang MailerService (SMTP)
     if (fallbackMailerService) {
       try {
         this.logger.log(`📧 [MailerService SMTP] Thử gửi qua SMTP tới ${options.to}`);
