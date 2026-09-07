@@ -31,7 +31,7 @@ export class Address extends BaseEntity {
     @Column({ default: false })
     isDefault: boolean;
 
-    @ManyToOne(() => User)
+    @ManyToOne(() => User, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'user_id' })
     user: User;
 

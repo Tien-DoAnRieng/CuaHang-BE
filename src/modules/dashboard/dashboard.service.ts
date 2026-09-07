@@ -306,7 +306,7 @@ async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<B
 
   const orders = await ordersQuery.getMany();
   orders.forEach(o => {
-    sheet.addRow([o.id, o.user.name, o.totalAmount, o.createdAt]);
+    sheet.addRow([o.id, o.user?.name || 'N/A', o.totalAmount, o.createdAt]);
   });
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();

@@ -399,11 +399,13 @@ export class OrderService {
     });
 
     // Hoàn lại tiền cashback đã sử dụng và thu hồi cashback tích lũy nếu có
-    try {
-      await this.membershipService.refundSpentCashback(order.userId, order.id);
-      await this.membershipService.revokeOrderCashback(order.id);
-    } catch (err: any) {
-      this.logger.error(`Failed to handle cashback refund/revoke for cancelled order ${id}:`, err?.message || err);
+    if (order.userId) {
+      try {
+        await this.membershipService.refundSpentCashback(order.userId, order.id);
+        await this.membershipService.revokeOrderCashback(order.id);
+      } catch (err: any) {
+        this.logger.error(`Failed to handle cashback refund/revoke for cancelled order ${id}:`, err?.message || err);
+      }
     }
 
     return this.orderRepository.findOne({ where: { id }, relations: ['items'] }) as Promise<Order>;
@@ -572,14 +574,14 @@ export class OrderService {
     }
 
     // Xử lý Cập nhật Hạng Thành viên & Hoàn tiền Cashback khi Đơn hàng HOÀN THÀNH
-    if (status === OrderStatus.COMPLETED) {
+    if (saved.userId && status === OrderStatus.COMPLETED) {
       try {
         await this.membershipService.recalculateUserTier(saved.userId);
         await this.membershipService.processOrderCashback(saved);
       } catch (err: any) {
         this.logger.error(`❌ [updateStatus] Failed to process membership tier/cashback for order ${id}:`, err?.message || err);
       }
-    } else if (status === OrderStatus.CANCELLED || status === OrderStatus.REFUNDED) {
+    } else if (saved.userId && (status === OrderStatus.CANCELLED || status === OrderStatus.REFUNDED)) {
       try {
         await this.membershipService.refundSpentCashback(saved.userId, saved.id);
         await this.membershipService.revokeOrderCashback(saved.id);

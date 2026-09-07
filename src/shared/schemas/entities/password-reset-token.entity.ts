@@ -19,7 +19,7 @@ export class PasswordResetToken extends BaseEntity {
   used: boolean;
 
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }
