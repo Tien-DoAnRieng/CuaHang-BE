@@ -647,10 +647,33 @@ export class OrderService {
 
       this.logger.log(`📧 [sendEmailDirectly] Email options:`, JSON.stringify(emailOptions, null, 2));
 
-      const result = await this.mailerService.sendMail(emailOptions);
-      
-      this.logger.log(`✅ [sendEmailDirectly] Email sent successfully to ${to} for order ${orderId}`);
-      this.logger.log(`✅ [sendEmailDirectly] Send result:`, result);
+      try {
+        const result = await this.mailerService.sendMail(emailOptions);
+        this.logger.log(`✅ [sendEmailDirectly] Email sent successfully to ${to} for order ${orderId}`);
+        this.logger.log(`✅ [sendEmailDirectly] Send result:`, result);
+      } catch (tmplError) {
+        this.logger.warn(`⚠️ [sendEmailDirectly] Template send failed, using HTML fallback:`, tmplError);
+        const fallbackResult = await this.mailerService.sendMail({
+          to,
+          subject: `Thông báo cập nhật trạng thái đơn hàng #${orderId}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #4f46e5;">Thông báo cập nhật đơn hàng</h2>
+              <p>Xin chào <strong>${customerName || 'Quý khách'}</strong>,</p>
+              <p>Chúng tôi xin thông báo về tình trạng đơn hàng của bạn:</p>
+              <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e2e8f0;">
+                <p style="margin: 5px 0;"><strong>Mã đơn hàng:</strong> #${orderId}</p>
+                <p style="margin: 5px 0;"><strong>Trạng thái:</strong> <span style="background: #4f46e5; color: white; padding: 3px 8px; border-radius: 12px; font-size: 13px;">${statusText}</span></p>
+                <p style="margin: 5px 0;"><strong>Tổng tiền:</strong> ${orderTotal.toLocaleString('vi-VN')}₫</p>
+              </div>
+              <p>Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi!</p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+              <p style="color: #64748b; font-size: 12px;">Đây là email tự động, vui lòng không trả lời email này.</p>
+            </div>
+          `,
+        });
+        this.logger.log(`✅ [sendEmailDirectly] Fallback HTML email sent successfully to ${to}`, fallbackResult);
+      }
     } catch (error: any) {
       this.logger.error(`❌ [sendEmailDirectly] Failed to send email directly to ${to} for order ${orderId}`);
       this.logger.error(`❌ [sendEmailDirectly] Error message:`, error?.message);

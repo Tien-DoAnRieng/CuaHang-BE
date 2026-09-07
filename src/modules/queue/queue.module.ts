@@ -1,12 +1,13 @@
-// src/queue/queue.module.ts
 import { BullModule } from '@nestjs/bull';
 import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { QueueService } from './queue.service';
-import { EmailProcessor } from '.././queue/processors/email.processor';
+import { EmailProcessor } from './processors/email.processor';
 
 @Module({
   imports: [
+    MailerModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

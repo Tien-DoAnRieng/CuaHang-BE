@@ -31,15 +31,18 @@ import { MemberTypeModule } from './modules/member-type/member-type.module';
 import { CouponModule } from './modules/coupon/coupon.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { GhnModule } from './modules/ghn/ghn.module';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { mailerConfig } from './config/mailer.config';
+
 @Module({
   imports: [
-
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [cloudinaryConfig,vnpayConfig],
+      load: [cloudinaryConfig, vnpayConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
-  UserModule,
+    MailerModule.forRootAsync(mailerConfig),
+    UserModule,
   ProductModule,
   PaymentModule,
   CategoryModule,

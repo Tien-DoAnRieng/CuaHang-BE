@@ -2,14 +2,18 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
+const port = Number(process.env.MAIL_PORT) || 465;
+const secure = process.env.MAIL_SECURE === 'true' || port === 465;
+
 const transporter = nodemailer.createTransport({
   host: process.env.MAIL_HOST || 'smtp.gmail.com',
-  port: Number(process.env.MAIL_PORT) || 587,
-  secure: false,
+  port,
+  secure,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASSWORD,
   },
+  connectionTimeout: 10000,
 });
 
 async function testEmail() {

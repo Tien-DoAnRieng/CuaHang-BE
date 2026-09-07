@@ -33,27 +33,7 @@ import { redisStore } from 'cache-manager-ioredis-yet';
         signOptions: { expiresIn: '30d' }, // Tăng lên 30 ngày
       }),
     }),
-    MailerModule.forRoot({
-      transport: {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.MAIL_USER,
-          pass: process.env.MAIL_PASSWORD,
-        },
-      },
-      defaults: {
-        from: '"No Reply" <noreply@nestjs.com>',
-      },
-      template: {
-        dir: join(process.cwd(), 'src/modules/auth/templates'),
-        adapter: new HandlebarsAdapter(),
-        options: {
-          strict: true,
-        },
-      },
-    }),
+    MailerModule,
     CacheModule.registerAsync({
       isGlobal: false,
       useFactory: async () => ({

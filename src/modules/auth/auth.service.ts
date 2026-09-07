@@ -96,12 +96,30 @@ export class AuthService implements OnApplicationBootstrap {
           throw new Error('Mail configuration is missing. Please set MAIL_USER and MAIL_PASSWORD in .env file');
         }
 
-        await this.mailerService.sendMail({
-          to: email,
-          subject: 'Mã xác thực tài khoản',
-          template: 'verify-email',
-          context: { name, otp },
-        });
+        try {
+          await this.mailerService.sendMail({
+            to: email,
+            subject: 'Mã xác thực tài khoản',
+            template: 'verify-email',
+            context: { name, otp },
+          });
+        } catch (tmplError) {
+          this.logger.warn(`⚠️ Template verify-email failed, using HTML fallback:`, tmplError);
+          await this.mailerService.sendMail({
+            to: email,
+            subject: 'Mã xác thực tài khoản',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <h2>Xin chào ${name},</h2>
+                <p>Mã xác thực tài khoản của bạn là:</p>
+                <h1 style="color: #2563eb; letter-spacing: 4px; font-size: 32px;">${otp}</h1>
+                <p>Mã này có hiệu lực trong 10 phút.</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+                <p style="color: #64748b; font-size: 14px;">Trân trọng,<br/>Đội ngũ hỗ trợ E-Commerce</p>
+              </div>
+            `,
+          });
+        }
         
         this.logger.log(`✅ OTP email sent successfully to ${email}`);
         
@@ -284,12 +302,29 @@ export class AuthService implements OnApplicationBootstrap {
     );
 
     // Gửi mail OTP
-    await this.mailerService.sendMail({
-      to: user.email,
-      subject: 'Mã đặt lại mật khẩu',
-      template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
-      context: { name: user.name, otp },
-    });
+    try {
+      await this.mailerService.sendMail({
+        to: user.email,
+        subject: 'Mã đặt lại mật khẩu',
+        template: 'reset-password', // 📁 src/modules/auth/templates/reset-password.hbs
+        context: { name: user.name, otp },
+      });
+    } catch (tmplError) {
+      this.logger.warn(`⚠️ Template reset-password failed, using HTML fallback:`, tmplError);
+      await this.mailerService.sendMail({
+        to: user.email,
+        subject: 'Mã đặt lại mật khẩu',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h3>Xin chào ${user.name},</h3>
+            <p>Bạn đã yêu cầu đặt lại mật khẩu. Đây là mã OTP của bạn:</p>
+            <h2 style="color: #007bff; letter-spacing: 4px; font-size: 28px;">${otp}</h2>
+            <p>Mã có hiệu lực trong 10 phút.</p>
+            <p style="color: #64748b; font-size: 13px;">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+          </div>
+        `,
+      });
+    }
 
     return { message: 'Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn' };
   }
