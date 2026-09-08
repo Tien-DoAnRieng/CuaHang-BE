@@ -234,6 +234,7 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
 
   const qb = this.productRepository.createQueryBuilder('product')
     .leftJoinAndSelect('product.category', 'category')
+    .leftJoinAndSelect('category.parent', 'parent')
     .leftJoinAndSelect('product.brandEntity', 'brandEntity')
     .leftJoinAndSelect('product.variants', 'variants')
     .leftJoinAndSelect('variants.color', 'color')      
@@ -266,14 +267,39 @@ async findAll(query: any): Promise<{ data: Product[]; total: number; page: numbe
     console.log('[ProductService.findAll] No sellerId filter - returning all products');
   }
 
-  // Hỗ trợ filter theo cả ID hoặc name của category
+  // Hỗ trợ filter theo cả ID hoặc name của category (hỗ trợ các tổ hợp "Điện thoại & Tablet", danh sách dấu phẩy, alias)
   if (category) {
-    // Nếu category là UUID (có dấu gạch ngang), filter theo ID
-    if (category.includes('-')) {
-      qb.andWhere('category.id = :category', { category });
+    const rawCategory = String(category).trim();
+    const rawLower = rawCategory.toLowerCase();
+    let catTerms: string[] = [];
+
+    if (rawLower === 'electronics') {
+      catTerms = ['Điện Tử', 'Điện Thoại', 'Tablet', 'Laptop & PC'];
+    } else if (rawLower === 'laptops') {
+      catTerms = ['Laptop & PC'];
+    } else if (rawLower.includes('điện thoại') && rawLower.includes('tablet')) {
+      catTerms = ['Điện Thoại', 'Tablet'];
+    } else if (rawLower.includes('đồng hồ') && rawLower.includes('phụ kiện')) {
+      catTerms = ['Phụ Kiện', 'Đồng Hồ'];
+    } else if (rawCategory.includes(',')) {
+      catTerms = rawCategory.split(',').map(s => s.trim()).filter(Boolean);
     } else {
-      // Ngược lại filter theo name
-      qb.andWhere('LOWER(category.name) = :category', { category: category.toLowerCase() });
+      catTerms = [rawCategory];
+    }
+
+    const isUuid = catTerms.some(c => c.includes('-'));
+
+    if (isUuid) {
+      qb.andWhere('(category.id IN (:...catTerms) OR category.parentId IN (:...catTerms))', { catTerms });
+    } else {
+      const lowerTerms = catTerms.map(c => c.toLowerCase());
+      qb.andWhere(
+        '(LOWER(category.name) IN (:...lowerTerms) OR LOWER(parent.name) IN (:...lowerTerms) OR LOWER(category.name) LIKE :likeCat)',
+        {
+          lowerTerms,
+          likeCat: `%${lowerTerms[0]}%`,
+        }
+      );
     }
   }
 
