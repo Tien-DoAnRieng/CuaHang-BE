@@ -253,23 +253,36 @@ export class ChatService {
     }
   }
 
-  private checkHitlKeywords(message: string, keywordsStr?: string): boolean {
+  private checkHitlKeywords(message: string, customEmergencyKeywords?: string): boolean {
     if (!message) return false;
-    const rawKeywords =
-      keywordsStr ||
-      'lừa đảo, khiếu nại, gặp nhân viên, gặp admin, gặp người thật, hỗ trợ người thật, thái độ, bồi thường, trả hàng gấp, đổi trả gấp, hủy đơn khẩn cấp, hoàn tiền gấp, kiện, cướp, công an, tư vấn viên, liên hệ admin, gặp quản lý, nhân viên hỗ trợ, nói chuyện với người, đền tiền, giao thiếu hàng, hàng hỏng, vỡ hàng';
-    const keywords = rawKeywords
-      .split(',')
-      .map((k) => k.trim().toLowerCase())
-      .filter(Boolean);
-    const lowerMessage = message.toLowerCase();
-    const unaccentMessage = this.removeVietnameseTones(lowerMessage);
+    const unaccent = this.removeVietnameseTones(message.toLowerCase());
 
-    return keywords.some((kw) => {
-      const lowerKw = kw.toLowerCase();
-      const unaccentKw = this.removeVietnameseTones(lowerKw);
-      return lowerMessage.includes(lowerKw) || unaccentMessage.includes(unaccentKw);
-    });
+    // 1. Handover Intent Regex Patterns: bao quát mọi biến thể chat với người thật, nhân viên, shop
+    const handoverPatterns = [
+      /\b(chat|noi chuyen|gap|can gap|cho gap|lien he|ket noi|chuyen|chuyen sang)\s+(voi\s+)?(nhan vien|tu van vien|nguoi that|admin|shop|quan ly|chuyen vien)\b/i,
+      /\b(nhan vien|tu van vien|chuyen vien|admin)\s+(ho tro|tu van|tiep quan|cham soc)\b/i,
+      /\b(chat voi shop|chat voi nguoi that|noi chuyen nguoi that|gap nguoi that|ho tro nguoi that)\b/i,
+      /\b(muon gap nhan vien|muon chat voi nhan vien|cho toi gap nhan vien|cho minh gap nhan vien|muon gap admin)\b/i,
+      /\b(tu van vien|chuyen vien tu van|nhan vien cham soc|nhan vien ho tro)\b/i,
+      /\b(lua dao|khieu nai|boi thuong|kien|cong an|thai do te|doi tra gap|huy don khan cap|hoan tien gap)\b/i,
+    ];
+
+    for (const pattern of handoverPatterns) {
+      if (pattern.test(unaccent)) return true;
+    }
+
+    // 2. Custom emergency keywords from DB
+    if (customEmergencyKeywords) {
+      const customKeywords = customEmergencyKeywords
+        .split(/[,;]+/)
+        .map((k) => this.removeVietnameseTones(k.trim()))
+        .filter(Boolean);
+      for (const kw of customKeywords) {
+        if (unaccent.includes(kw)) return true;
+      }
+    }
+
+    return false;
   }
 
   async toggleTakeover(userId: string, isBotMuted: boolean) {
@@ -314,6 +327,34 @@ export class ChatService {
   // ==========================================
   // 4. PRODUCT INTENT & SEARCH HELPERS
   // ==========================================
+  private readonly categoryKeywords: Record<string, string> = {
+    'dien thoai': 'Điện Thoại',
+    'smartphone': 'Điện Thoại',
+    'phone': 'Điện Thoại',
+    'tablet': 'Tablet',
+    'may tinh bang': 'Tablet',
+    'ipad': 'Tablet',
+    'laptop': 'Laptop & PC',
+    'may tinh': 'Laptop & PC',
+    'pc': 'Laptop & PC',
+    'macbook': 'Laptop & PC',
+    'thoi trang nam': 'Thời trang Nam',
+    'do nam': 'Thời trang Nam',
+    'thoi trang nu': 'Thời trang Nữ',
+    'do nu': 'Thời trang Nữ',
+    'suc khoe': 'Sức khỏe & Làm đẹp',
+    'lam dep': 'Sức khỏe & Làm đẹp',
+    'my pham': 'Sức khỏe & Làm đẹp',
+    'nha cua': 'Nhà cửa & Đời sống',
+    'doi song': 'Nhà cửa & Đời sống',
+    'gia dung': 'Nhà cửa & Đời sống',
+    'dong ho': 'Đồng hồ & Phụ kiện',
+    'phu kien': 'Đồng hồ & Phụ kiện',
+    'gaming': 'Gaming & Gears',
+    'gears': 'Gaming & Gears',
+    'dien tu': 'Điện Tử',
+  };
+
   private isCheapestIntent(message: string): boolean {
     const text = (message || '').toLowerCase();
     return /(re\s*nhat|rẻ\s*nhất|gia\s*re\s*nhat|giá\s*rẻ\s*nhất|thap\s*nhat|thấp\s*nhất|cheapest|min\s*price)/i.test(
@@ -343,6 +384,284 @@ export class ChatService {
     return /(flash\s*sale|f\s*sale|sale\s*soc|sale\s*sốc|khuyen\s*mai|khuyến\s*mãi|dang\s*giam\s*gia|đang\s*giảm\s*giá)/i.test(
       text,
     );
+  }
+
+  private extractRequestedLimit(message: string): number {
+    const text = (message || '').toLowerCase();
+    const match = text.match(
+      /(?:top\s*|danh\s*sach\s*|cho\s*(?:toi|minh|em)\s*)?(\d+)\s*(?:san\s*pham|sp|dien\s*thoai|laptop|mau|cai|chiec|mon|item|dong\s*may)?/i,
+    );
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (num >= 1 && num <= 20) return num;
+    }
+    return 5;
+  }
+
+  private extractCategoryFromMessage(message: string): string | undefined {
+    const unaccent = this.removeVietnameseTones(message);
+    const keys = Object.keys(this.categoryKeywords).sort((a, b) => b.length - a.length);
+    for (const key of keys) {
+      if (new RegExp(`\\b${key}\\b`, 'i').test(unaccent)) {
+        return this.categoryKeywords[key];
+      }
+    }
+    return undefined;
+  }
+
+  private cleanSearchKeyword(message: string): string {
+    const stopWords = [
+      'cho', 'toi', 'em', 'minh', 'ban', 'shop', 'ad', 'admin', 'oi', 'nhe', 'nha', 'a',
+      'san pham', 'sp', 'loai', 'mau', 'chiec', 'cai', 'mon', 'hang',
+      'co', 'gia', 're', 'thap', 'cao', 'dat', 'nhat', 'tam', 'khoang',
+      'tu van', 'tim', 'kiem', 'mua', 'can', 'xem', 'hoi', 'gioi thieu', 'goi y',
+      'top', 'nao', 'gi', 'duoi', 'tren', 'tot', 'chay', 'soc', 'dang', 'giam', 'khuyen mai',
+      'chat', 'nhan vien', 'nguoi that', 'tu van vien', 'noi chuyen', 'gap', 'lien he', 'chuyen sang', 'chuyen', 'ket noi', 'muon', 'voi',
+    ];
+    let cleaned = this.removeVietnameseTones(message);
+    cleaned = cleaned.replace(/\b\d+\b/g, ' ');
+    for (const sw of stopWords) {
+      const reg = new RegExp(`\\b${sw}\\b`, 'gi');
+      cleaned = cleaned.replace(reg, ' ');
+    }
+    return cleaned.replace(/\s+/g, ' ').trim();
+  }
+
+  private extractQueryCriteria(message: string, productId?: string) {
+    const limit = this.extractRequestedLimit(message);
+    const category = this.extractCategoryFromMessage(message);
+    const maxPrice = this.extractBudgetFromMessage(message);
+
+    let sortBy: 'price_asc' | 'price_desc' | 'best_selling' | 'newest' | 'flash_sale' = 'newest';
+    if (this.isCheapestIntent(message) || this.prefersLowPrice(message)) {
+      sortBy = 'price_asc';
+    } else if (this.isHighestPriceIntent(message)) {
+      sortBy = 'price_desc';
+    } else if (this.isBestSellingIntent(message)) {
+      sortBy = 'best_selling';
+    } else if (this.isFlashSaleIntent(message)) {
+      sortBy = 'flash_sale';
+    }
+
+    let cleanedKeyword = this.cleanSearchKeyword(message);
+
+    // If a category was matched, remove all category trigger terms from cleanedKeyword
+    // so words like "máy tính bảng" or "điện thoại" don't become search keywords against product.name!
+    if (category) {
+      for (const [key, val] of Object.entries(this.categoryKeywords)) {
+        if (val === category) {
+          cleanedKeyword = cleanedKeyword.replace(new RegExp(`\\b${key}\\b`, 'gi'), ' ');
+        }
+      }
+      cleanedKeyword = cleanedKeyword.replace(/\s+/g, ' ').trim();
+    }
+
+    return {
+      limit,
+      category,
+      maxPrice: maxPrice || undefined,
+      sortBy,
+      keyword: cleanedKeyword || undefined,
+      productId,
+    };
+  }
+
+  async executeSearchProducts(params: {
+    keyword?: string;
+    category?: string;
+    brand?: string;
+    sortBy?: 'price_asc' | 'price_desc' | 'best_selling' | 'newest' | 'flash_sale';
+    minPrice?: number;
+    maxPrice?: number;
+    limit?: number;
+    productId?: string;
+  }): Promise<Product[]> {
+    const limit = Math.min(Math.max(params.limit || 5, 1), 20);
+
+    if (params.productId) {
+      const direct = await this.productRepo.findOne({
+        where: { id: params.productId, status: 'ACTIVE' },
+        relations: ['category', 'brandEntity', 'images', 'variants'],
+      });
+      if (direct) return [direct];
+    }
+
+    // 1. Flash sale specific
+    if (params.sortBy === 'flash_sale') {
+      const flashProducts = await this.findActiveFlashSaleProducts(limit * 2);
+      if (flashProducts.length > 0) {
+        let filtered = flashProducts;
+        if (params.category) {
+          const catNorm = this.removeVietnameseTones(params.category);
+          filtered = filtered.filter(
+            (p) => p.category && this.removeVietnameseTones(p.category.name).includes(catNorm),
+          );
+        }
+        if (params.keyword) {
+          const kwNorm = this.removeVietnameseTones(params.keyword);
+          filtered = filtered.filter((p) => this.removeVietnameseTones(p.name).includes(kwNorm));
+        }
+        if (filtered.length > 0) return filtered.slice(0, limit);
+        return flashProducts.slice(0, limit);
+      }
+    }
+
+    // 2. Best selling specific
+    if (params.sortBy === 'best_selling') {
+      const bestSelling = await this.findBestSellingProducts(limit * 2);
+      if (bestSelling.length > 0) {
+        let filtered = bestSelling;
+        if (params.category) {
+          const catNorm = this.removeVietnameseTones(params.category);
+          filtered = filtered.filter(
+            (p) => p.category && this.removeVietnameseTones(p.category.name).includes(catNorm),
+          );
+        }
+        if (params.brand) {
+          const brandNorm = this.removeVietnameseTones(params.brand);
+          filtered = filtered.filter(
+            (p) => p.brandEntity && this.removeVietnameseTones(p.brandEntity.name).includes(brandNorm),
+          );
+        }
+        if (params.maxPrice && params.maxPrice > 0) {
+          filtered = filtered.filter((p) => this.normalizeNumber(p.price) <= params.maxPrice!);
+        }
+        if (params.keyword) {
+          const kwNorm = this.removeVietnameseTones(params.keyword);
+          filtered = filtered.filter(
+            (p) =>
+              this.removeVietnameseTones(p.name).includes(kwNorm) ||
+              (p.description && this.removeVietnameseTones(p.description).includes(kwNorm)),
+          );
+        }
+        if (filtered.length > 0) return filtered.slice(0, limit);
+      }
+    }
+
+    // 3. Main query
+    const qb = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.brandEntity', 'brandEntity')
+      .leftJoinAndSelect('product.images', 'images')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .where('product.status = :status', { status: 'ACTIVE' });
+
+    if (params.category && params.category.trim()) {
+      const cat = params.category.trim();
+      qb.andWhere('(category.name LIKE :catName OR category.description LIKE :catName)', {
+        catName: `%${cat}%`,
+      });
+    }
+
+    if (params.brand && params.brand.trim()) {
+      qb.andWhere('brandEntity.name LIKE :brandName', {
+        brandName: `%${params.brand.trim()}%`,
+      });
+    }
+
+    if (params.minPrice && params.minPrice > 0) {
+      qb.andWhere('product.price >= :minPrice', { minPrice: params.minPrice });
+    }
+    if (params.maxPrice && params.maxPrice > 0) {
+      qb.andWhere('product.price <= :maxPrice', { maxPrice: params.maxPrice });
+    }
+
+    if (params.keyword && params.keyword.trim()) {
+      const kw = params.keyword.trim();
+      const tokens = kw.split(/\s+/).filter((t) => t.length > 1);
+
+      if (tokens.length <= 1) {
+        qb.andWhere(
+          '(product.name LIKE :kw OR product.description LIKE :kw OR category.name LIKE :kw OR brandEntity.name LIKE :kw)',
+          { kw: `%${kw}%` },
+        );
+      } else {
+        qb.andWhere(
+          `(product.name LIKE :fullKw OR product.description LIKE :fullKw OR ` +
+            tokens
+              .map((_, i) => `product.name LIKE :k${i} OR brandEntity.name LIKE :k${i}`)
+              .join(' OR ') +
+            `)`,
+          {
+            fullKw: `%${kw}%`,
+            ...tokens.reduce((acc, t, i) => ({ ...acc, [`k${i}`]: `%${t}%` }), {}),
+          },
+        );
+      }
+    }
+
+    if (params.sortBy === 'price_asc') {
+      qb.orderBy('product.price', 'ASC');
+    } else if (params.sortBy === 'price_desc') {
+      qb.orderBy('product.price', 'DESC');
+    } else if (params.sortBy === 'newest') {
+      qb.orderBy('product.createdAt', 'DESC');
+    } else {
+      qb.orderBy('product.createdAt', 'DESC');
+    }
+
+    const results = await qb.take(limit).getMany();
+    if (results.length > 0) return results;
+
+    // Fallback relaxation if keyword was too restrictive with category
+    if (params.category && params.keyword) {
+      const relaxTokens = params.keyword.split(/\s+/).filter((t) => t.length > 1);
+      const relaxQb = this.productRepo
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.brandEntity', 'brandEntity')
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoinAndSelect('product.variants', 'variants')
+        .where('product.status = :status', { status: 'ACTIVE' })
+        .andWhere('(category.name LIKE :catName OR category.description LIKE :catName)', {
+          catName: `%${params.category.trim()}%`,
+        });
+
+      if (relaxTokens.length > 0) {
+        relaxQb.andWhere(
+          relaxTokens.map((_, i) => `product.name LIKE :rt${i}`).join(' OR '),
+          relaxTokens.reduce((acc, t, i) => ({ ...acc, [`rt${i}`]: `%${t}%` }), {}),
+        );
+      }
+
+      if (params.sortBy === 'price_asc') relaxQb.orderBy('product.price', 'ASC');
+      else if (params.sortBy === 'price_desc') relaxQb.orderBy('product.price', 'DESC');
+      else relaxQb.orderBy('product.createdAt', 'DESC');
+
+      const relaxResults = await relaxQb.take(limit).getMany();
+      if (relaxResults.length > 0) return relaxResults;
+    }
+
+    // If category was specified and still no results (e.g. price/keyword was too strict),
+    // query products strictly WITHIN THAT CATEGORY!
+    if (params.category && params.category.trim()) {
+      const catOnlyQb = this.productRepo
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.brandEntity', 'brandEntity')
+        .leftJoinAndSelect('product.images', 'images')
+        .leftJoinAndSelect('product.variants', 'variants')
+        .where('product.status = :status', { status: 'ACTIVE' })
+        .andWhere('(category.name LIKE :catName OR category.description LIKE :catName)', {
+          catName: `%${params.category.trim()}%`,
+        });
+
+      if (params.sortBy === 'price_asc') catOnlyQb.orderBy('product.price', 'ASC');
+      else if (params.sortBy === 'price_desc') catOnlyQb.orderBy('product.price', 'DESC');
+      else catOnlyQb.orderBy('product.createdAt', 'DESC');
+
+      const catResults = await catOnlyQb.take(limit).getMany();
+      if (catResults.length > 0) return catResults;
+      return [];
+    }
+
+    // Only return general budget products if NEITHER category NOR keyword was specified!
+    if (!params.category && !params.keyword) {
+      return this.findFallbackProductsByBudget(params.maxPrice, limit);
+    }
+
+    return [];
   }
 
   private async findHighestPriceProducts(limit: number = 10): Promise<Product[]> {
@@ -429,58 +748,23 @@ export class ChatService {
   }
 
   private async findRelevantProducts(message: string, productId?: string, maxPrice?: number): Promise<Product[]> {
-    if (productId) {
-      const direct = await this.productRepo.findOne({
-        where: { id: productId, status: 'ACTIVE' },
-        relations: ['category', 'brandEntity', 'images', 'variants'],
-      });
-      if (direct) return [direct];
-    }
-
-    const cleaned = message.replace(/[^a-zA-Z0-9\sà-ỹÀ-Ỹ]/g, ' ').trim();
-    const tokens = cleaned.split(/\s+/).filter((t) => t.length > 1);
-
-    const qb = this.productRepo
-      .createQueryBuilder('product')
-      .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.brandEntity', 'brandEntity')
-      .leftJoinAndSelect('product.images', 'images')
-      .leftJoinAndSelect('product.variants', 'variants')
-      .where('product.status = :status', { status: 'ACTIVE' });
-
-    if (maxPrice && maxPrice > 0) {
-      qb.andWhere('product.price <= :maxPrice', { maxPrice });
-    }
-
-    if (tokens.length > 0) {
-      qb.andWhere(
-        tokens
-          .slice(0, 5)
-          .map(
-            (_, idx) =>
-              `(product.name LIKE :t${idx} OR product.description LIKE :t${idx} OR category.name LIKE :t${idx} OR brandEntity.name LIKE :t${idx})`,
-          )
-          .join(' OR '),
-        tokens.slice(0, 5).reduce((acc, t, idx) => ({ ...acc, [`t${idx}`]: `%${t}%` }), {}),
-      );
-    }
-
-    qb.orderBy(maxPrice && maxPrice > 0 ? 'product.price' : 'product.createdAt', maxPrice ? 'ASC' : 'DESC');
-    const results = await qb.take(5).getMany();
-    if (results.length > 0) return results;
-
-    return this.findFallbackProductsByBudget(maxPrice, 5);
+    const criteria = this.extractQueryCriteria(message, productId);
+    if (maxPrice && maxPrice > 0) criteria.maxPrice = maxPrice;
+    return this.executeSearchProducts(criteria);
   }
 
   private extractBudgetFromMessage(message: string): number | null {
     const text = (message || '').toLowerCase();
-    const millionMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(trieu|triệu|tr|m)\b/i);
+    // Only match million if explicitly: triệu, trieu, tr, củ, cu, or standalone 'm' not followed by letters/digits
+    // E.g.: "15m", "15tr", "15 triệu", "15 củ"
+    // MUST NOT match "3 máy", "5 mẫu", "2 món", "4 mắt"...
+    const millionMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:trieu|triệu|tr\b|củ\b|cu\b|(?:m(?![a-zà-ỹ0-9])))/iu);
     if (millionMatch) {
       const val = parseFloat(millionMatch[1].replace(',', '.'));
       if (Number.isFinite(val) && val > 0) return Math.round(val * 1_000_000);
     }
 
-    const thousandMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(k|nghin|nghìn|ngan|ngàn)\b/i);
+    const thousandMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:k\b|nghin|nghìn|ngan|ngàn)/iu);
     if (thousandMatch) {
       const val = parseFloat(thousandMatch[1].replace(',', '.'));
       if (Number.isFinite(val) && val > 0) return Math.round(val * 1_000);
@@ -511,14 +795,44 @@ export class ChatService {
   }
 
   // ==========================================
-  // 5. CALL GEMINI API
+  // 5. CALL GEMINI API WITH TOOL/FUNCTION CALLING
   // ==========================================
+  private getProductSearchToolDefinition() {
+    return {
+      functionDeclarations: [
+        {
+          name: 'search_products',
+          description: 'Tìm kiếm sản phẩm trong kho hàng theo từ khóa, danh mục, thương hiệu, khoảng giá và cách sắp xếp.',
+          parameters: {
+            type: 'OBJECT',
+            properties: {
+              keyword: { type: 'STRING', description: 'Từ khóa tên sản phẩm hoặc đặc điểm cần tìm (ví dụ: iphone, tai nghe, áo khoác)' },
+              category: {
+                type: 'STRING',
+                description: 'Tên danh mục sản phẩm (ví dụ: Điện Thoại, Tablet, Laptop & PC, Thời trang Nam, Thời trang Nữ, Sức khỏe & Làm đẹp, Nhà cửa & Đời sống, Đồng hồ & Phụ kiện, Gaming & Gears, Điện Tử)',
+              },
+              brand: { type: 'STRING', description: 'Tên thương hiệu nếu có (ví dụ: Apple, Samsung, Xiaomi, Sony, Asus, L\'Oreal, Casio...)' },
+              sortBy: {
+                type: 'STRING',
+                enum: ['price_asc', 'price_desc', 'best_selling', 'newest', 'flash_sale'],
+                description: 'Cách sắp xếp: price_asc (giá thấp nhất/rẻ nhất), price_desc (giá cao nhất/đắt nhất), best_selling (bán chạy nhất), newest (mới nhất), flash_sale (khuyến mãi)',
+              },
+              minPrice: { type: 'NUMBER', description: 'Giá tối thiểu VND' },
+              maxPrice: { type: 'NUMBER', description: 'Giá tối đa VND' },
+              limit: { type: 'NUMBER', description: 'Số lượng sản phẩm cần lấy (mặc định 5, tối đa 20)' },
+            },
+          },
+        },
+      ],
+    };
+  }
+
   private async callGemini(
     prompt: string,
     systemInstruction?: string,
     temperature: number = 0.3,
-    maxOutputTokens: number = 800,
-  ): Promise<string | null> {
+    maxOutputTokens: number = 400,
+  ): Promise<{ text: string; products?: Product[] } | null> {
     const now = Date.now();
     if (now < this.geminiCooldownUntil) {
       this.lastGeminiIssue = 'quota';
@@ -537,7 +851,7 @@ export class ChatService {
       return null;
     }
 
-    const configuredModel = (this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash').trim();
+    const configuredModel = (this.configService.get<string>('GEMINI_MODEL') || 'gemini-flash-lite-latest').trim();
     const forceFallback = String(this.configService.get<string>('GEMINI_FORCE_FALLBACK') || '')
       .toLowerCase()
       .trim();
@@ -546,17 +860,25 @@ export class ChatService {
       return null;
     }
 
-    // Ưu tiên chính xác model 2.0 Flash
-    const modelCandidates = [configuredModel, 'gemini-2.0-flash', 'gemini-2.0-flash-lite'].filter(
-      (m, idx, arr) => m && arr.indexOf(m) === idx,
-    );
+    // Prioritize fast, low-latency models (~1.8s) first; heavier models as backup
+    const modelCandidates = [
+      configuredModel,
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
+    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
+
+    const tools = [this.getProductSearchToolDefinition()];
 
     for (const model of modelCandidates) {
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        
+
         const requestBody: any = {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          tools,
           generationConfig: {
             temperature: Math.min(Math.max(temperature, 0), 1),
             maxOutputTokens,
@@ -573,18 +895,21 @@ export class ChatService {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(6000),
         });
 
         if (response.status === 404) continue;
-        
+
+        if (response.status === 503) {
+          this.logger.warn(`Gemini 503 (High Demand) at ${model}, chuyen sang model tiep theo...`);
+          continue;
+        }
+
         if (response.status === 429) {
-          // Tự động giãn cách 5 - 10 giây (8 giây) khi bị quá tải Rate Limit
           const cooldownDurationMs = 8000;
           this.geminiCooldownUntil = Date.now() + cooldownDurationMs;
           this.lastGeminiIssue = 'quota';
-          this.logger.warn(`Gemini 429 (Rate Limit). Tu dong gian cach ${cooldownDurationMs / 1000}s truoc khi thu lai.`);
-          // Dừng ngay vòng lặp để không spam thêm request
+          this.logger.warn(`Gemini 429 (Rate Limit). Cooldown ${cooldownDurationMs / 1000}s.`);
           break;
         }
 
@@ -599,12 +924,110 @@ export class ChatService {
         const parts = candidate?.content?.parts;
         if (!Array.isArray(parts)) continue;
 
-        let text = parts
+        // Check for functionCall (Tool Call)
+        const fnPart = parts.find((p: any) => p.functionCall);
+        if (fnPart && fnPart.functionCall) {
+          const fnCall = fnPart.functionCall;
+          let callProducts: Product[] = [];
+          if (fnCall.name === 'search_products') {
+            const args = { ...(fnCall.args || {}) };
+            const extractedMax = this.extractBudgetFromMessage(prompt);
+            if (!args.maxPrice && extractedMax) args.maxPrice = extractedMax;
+            if (!args.sortBy && (this.isCheapestIntent(prompt) || this.prefersLowPrice(prompt))) {
+              args.sortBy = 'price_asc';
+            }
+            callProducts = await this.executeSearchProducts(args);
+          }
+
+          const productsPayload = callProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            price: this.normalizeNumber(p.price),
+            formattedPrice: `${new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price))} VNĐ`,
+            category: p.category?.name || 'Chung',
+            brand: p.brandEntity?.name || 'Khác',
+            description: (p.description || '').replace(/\s+/g, ' ').slice(0, 100),
+          }));
+
+          const secondTurnBody: any = {
+            contents: [
+              { role: 'user', parts: [{ text: prompt }] },
+              { role: 'model', parts },
+              {
+                role: 'user',
+                parts: [
+                  {
+                    functionResponse: {
+                      name: fnCall.name,
+                      response: {
+                        products: productsPayload,
+                        totalFound: callProducts.length,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+            tools,
+            generationConfig: {
+              temperature: Math.min(Math.max(temperature, 0), 1),
+              maxOutputTokens,
+            },
+          };
+          if (systemInstruction) {
+            secondTurnBody.systemInstruction = {
+              parts: [{ text: systemInstruction }],
+            };
+          }
+
+          try {
+            const secondResponse = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(secondTurnBody),
+              signal: AbortSignal.timeout(6000),
+            });
+
+            if (secondResponse.ok) {
+              const secondData: any = await secondResponse.json();
+              const secondCandidate = secondData?.candidates?.[0];
+              const secondParts = secondCandidate?.content?.parts;
+              if (Array.isArray(secondParts)) {
+                const finalContent = secondParts
+                  .map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
+                  .join('\n')
+                  .trim();
+                if (finalContent) {
+                  return { text: finalContent, products: callProducts };
+                }
+              }
+            }
+          } catch (err: any) {
+            this.logger.warn(`Gemini second turn error at ${model}: ${err?.message || err}`);
+          }
+
+          if (callProducts.length > 0) {
+            return {
+              text:
+                `Dạ shop gửi anh/chị danh sách ${callProducts.length} sản phẩm phù hợp:\n\n` +
+                callProducts
+                  .map(
+                    (p, i) =>
+                      `${i + 1}. ${p.name}: ${new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price))} VNĐ`,
+                  )
+                  .join('\n'),
+              products: callProducts,
+            };
+          }
+        }
+
+        // Direct Text Response
+        const directText = parts
           .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
           .join('\n')
           .trim();
 
-        if (text) return text;
+        if (directText) return { text: directText };
       } catch (error: any) {
         this.logger.error(`Gemini request failed at ${model}: ${error?.message || error}`);
         this.lastGeminiIssue = 'other';
@@ -744,7 +1167,7 @@ export class ChatService {
       await this.userRepo.save(user);
 
       const emergencyNotice =
-        'Dạ em đã ghi nhận phản ánh của anh/chị và đã chuyển yêu cầu đến chuyên viên hỗ trợ của shop. Nhân viên sẽ phản hồi trực tiếp với anh/chị trong ít phút nữa ạ!';
+        'Dạ em đã ghi nhận yêu cầu của anh/chị và đã chuyển cuộc trò chuyện sang cho chuyên viên hỗ trợ của shop. Em đang tự động chuyển anh/chị sang tab "Chat với Shop" để nhân viên hỗ trợ trực tiếp nhé ạ! ✨';
 
       const savedAiMessage = await this.chatMessageRepo.save(
         this.chatMessageRepo.create({
@@ -760,7 +1183,7 @@ export class ChatService {
       await this.chatMessageRepo.save(
         this.chatMessageRepo.create({
           userId,
-          message: `[Yêu cầu chuyển tiếp từ AI Chat]: ${trimmedMessage}`,
+          message: `[Yêu cầu kết nối từ AI Chat]: ${trimmedMessage}`,
           sender: 'user',
           isRead: false,
           isAi: false,
@@ -774,6 +1197,8 @@ export class ChatService {
           aiMessage: savedAiMessage,
           matchedProducts: [],
           isEmergencyHitl: true,
+          isHumanTakeover: true,
+          targetTab: 'admin',
         },
       };
     }
@@ -807,20 +1232,9 @@ export class ChatService {
       };
     }
 
-    // Retrieve relevant products
-    let products = cheapestIntent
-      ? await this.findFallbackProductsByBudget(maxPrice || undefined)
-      : highestIntent
-        ? await this.findHighestPriceProducts(10)
-        : bestSellingIntent
-          ? await this.findBestSellingProducts(10)
-          : flashSaleIntent
-            ? await this.findActiveFlashSaleProducts(5)
-            : await this.findRelevantProducts(trimmedMessage, productId, maxPrice || undefined);
-
-    if (products.length === 0) {
-      products = await this.findFallbackProductsByBudget(maxPrice || undefined);
-    }
+    // Retrieve relevant products using multi-factor criteria extractor
+    const criteria = this.extractQueryCriteria(trimmedMessage, productId);
+    let products = await this.executeSearchProducts(criteria);
     const productContext = this.buildProductContext(products);
 
     // Retrieve Knowledge Base (FAQ)
@@ -858,29 +1272,60 @@ export class ChatService {
       maxPrice && maxPrice > 0
         ? `(Ngân sách khách hàng đề cập: ${new Intl.NumberFormat('vi-VN').format(maxPrice)} VND)`
         : '',
+      '',
+      'LƯU Ý: Các sản phẩm phù hợp đã được nạp sẵn ở mục [DỮ LIỆU SẢN PHẨM TRONG HỆ THỐNG]. Hãy ưu tiên sử dụng danh sách này để tư vấn trực tiếp cho khách một cách nhanh chóng, súc tích và chính xác. Chỉ gọi tool search_products khi khách hàng yêu cầu tìm các sản phẩm khác chưa có ở trên.',
     ];
 
     const finalPrompt = promptParts.filter(Boolean).join('\n');
 
     this.lastGeminiIssue = 'none';
-    let aiTextRaw = await this.callGemini(
+    const geminiResult = await this.callGemini(
       finalPrompt,
       systemInstruction,
       aiConfig.temperature || 0.3,
     );
 
-    if (!aiTextRaw) {
+    let aiTextRaw: string;
+    if (geminiResult && geminiResult.text) {
+      aiTextRaw = geminiResult.text;
+      if (geminiResult.products && geminiResult.products.length > 0) {
+        products = geminiResult.products;
+      }
+    } else {
       aiTextRaw = this.generateSmartFallbackResponse(
         trimmedMessage,
         relevantFaqs,
         products,
-        maxPrice,
+        criteria.maxPrice || maxPrice || null,
         aiConfig,
       );
     }
 
     const aiText = this.compactAiText(aiTextRaw);
     this.setCachedAiResponse(cacheKey, aiText);
+
+    // If AI explicitly states that the shop does not sell/have the product or out of stock:
+    const isNegativeReply =
+      /(khong co|không có|khong kinh doanh|không kinh doanh|chua kinh doanh|chưa kinh doanh|khong ban|không bán|tam het hang|tạm hết hàng|khong tim thay|không tìm thấy)/i.test(
+        aiText,
+      );
+
+    let finalMatchedProducts = products;
+    if (isNegativeReply) {
+      finalMatchedProducts = [];
+    } else {
+      if (criteria.category) {
+        const catNorm = this.removeVietnameseTones(criteria.category);
+        finalMatchedProducts = finalMatchedProducts.filter(
+          (p) => p.category && this.removeVietnameseTones(p.category.name).includes(catNorm),
+        );
+      }
+      if (criteria.maxPrice && criteria.maxPrice > 0) {
+        finalMatchedProducts = finalMatchedProducts.filter(
+          (p) => this.normalizeNumber(p.price) <= criteria.maxPrice!,
+        );
+      }
+    }
 
     const savedAiMessage = await this.chatMessageRepo.save(
       this.chatMessageRepo.create({
@@ -897,7 +1342,7 @@ export class ChatService {
       data: {
         userMessage: savedUserMessage,
         aiMessage: savedAiMessage,
-        matchedProducts: products.slice(0, 5).map((p) => ({
+        matchedProducts: finalMatchedProducts.map((p) => ({
           id: p.id,
           name: p.name,
           price: this.normalizeNumber(p.price),
@@ -918,6 +1363,11 @@ export class ChatService {
     const text = (userMessage || '').trim().toLowerCase();
     const unaccentText = this.removeVietnameseTones(text);
 
+    // 0. Handover Intent (Nếu là yêu cầu gặp/chat với nhân viên)
+    if (this.checkHitlKeywords(userMessage)) {
+      return `Dạ em đã ghi nhận yêu cầu của anh/chị và đã chuyển cuộc trò chuyện sang cho chuyên viên hỗ trợ của shop. Anh/chị vui lòng chuyển sang tab "Chat với Shop" để được nhân viên hỗ trợ trực tiếp nhé ạ! ✨`;
+    }
+
     // 1. Greetings (Ưu tiên nếu là câu chào hỏi ngắn)
     const isPureGreeting = /^(chao|xin chao|hello|hi|hey|alo|shop oi|ad oi|admin oi|chao shop|chao ad|chao ban|hi shop|hello shop)(!|\?|\s+nhe|\s+nha|\s+a|\s+oi|\s+minh|\s+ban)*$/i.test(
       unaccentText,
@@ -928,18 +1378,22 @@ export class ChatService {
 
     // 2. Budget Search Intent (Tìm theo tầm giá cụ thể / rẻ nhất / cao cấp)
     if (maxPrice || this.isCheapestIntent(userMessage) || this.isHighestPriceIntent(userMessage)) {
+      const catName = this.extractCategoryFromMessage(userMessage);
       if (products && products.length > 0) {
         const budgetLabel = maxPrice
           ? `dưới ${new Intl.NumberFormat('vi-VN').format(maxPrice)}đ`
           : this.isCheapestIntent(userMessage)
             ? 'giá tốt nhất'
             : 'phân khúc cao cấp';
-        let response = `Dạ shop có các sản phẩm ${budgetLabel} hiện có tại cửa hàng:\n\n`;
-        products.slice(0, 5).forEach((p, idx) => {
+        const prefix = catName ? `sản phẩm ${catName}` : 'sản phẩm';
+        let response = `Dạ shop có các ${prefix} ${budgetLabel} hiện có tại cửa hàng:\n\n`;
+        products.forEach((p, idx) => {
           const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
           response += `${idx + 1}. ${p.name}: ${price} VNĐ\n`;
         });
         return response.trim();
+      } else if (catName) {
+        return `Dạ hiện tại shop chưa có sản phẩm ${catName} phù hợp với mức giá yêu cầu. Anh/chị có thể tham khảo các dòng ${catName} khác tại shop hoặc nhắn tin với nhân viên hỗ trợ nhé ạ!`;
       }
     }
 
@@ -951,7 +1405,8 @@ export class ChatService {
       // Nếu có thêm FAQ phụ liên quan
       if (relevantFaqs.length > 1) {
         const extraFaqs = relevantFaqs.slice(1, 3);
-        response += `\n\n📌 Thông tin hữu ích khác:\n` +
+        response +=
+          `\n\n📌 Thông tin hữu ích khác:\n` +
           extraFaqs.map((f) => `• ${f.question}: ${f.answer}`).join('\n');
       }
 
@@ -959,11 +1414,14 @@ export class ChatService {
       return response;
     }
 
-    // 3. Flash Sale & Giảm giá Intent
-    if (this.isFlashSaleIntent(userMessage) || /\b(flash sale|sale|khuyen mai|giam gia|voucher|ma giam gia|coupon|deal)\b/i.test(unaccentText)) {
+    // 4. Flash Sale & Giảm giá Intent
+    if (
+      this.isFlashSaleIntent(userMessage) ||
+      /\b(flash sale|sale|khuyen mai|giam gia|voucher|ma giam gia|coupon|deal)\b/i.test(unaccentText)
+    ) {
       if (products && products.length > 0) {
         let response = `🔥 Dạ các deal Flash Sale & Giảm giá cực hot đang diễn ra tại shop:\n\n`;
-        products.slice(0, 4).forEach((p, idx) => {
+        products.forEach((p, idx) => {
           const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
           response += `${idx + 1}. ${p.name}\n   💰 Giá ưu đãi: ${price}đ\n`;
         });
@@ -973,11 +1431,16 @@ export class ChatService {
       return `🔥 Dạ chương trình Flash Sale của shop đang diễn ra với nhiều ưu đãi giảm sâu đến 50%. Anh/chị có thể ghé mục Flash Sale tại trang chủ để nhận voucher và mua sắm với giá tốt nhất nhé ạ!`;
     }
 
-    // 4. Best-Selling Intent
-    if (this.isBestSellingIntent(userMessage) || /\b(ban chay|hot nhat|yeu thich|top ban chay|bestseller)\b/i.test(unaccentText)) {
+    // 5. Best-Selling Intent
+    if (
+      this.isBestSellingIntent(userMessage) ||
+      /\b(ban chay|hot nhat|yeu thich|top ban chay|bestseller)\b/i.test(unaccentText)
+    ) {
       if (products && products.length > 0) {
-        let response = `🌟 Top các sản phẩm bán chạy nhất được khách hàng yêu thích tại shop:\n\n`;
-        products.slice(0, 4).forEach((p, idx) => {
+        const catName = this.extractCategoryFromMessage(userMessage);
+        const prefix = catName ? `sản phẩm ${catName} ` : '';
+        let response = `🌟 Top các ${prefix}bán chạy nhất được khách hàng yêu thích tại shop:\n\n`;
+        products.forEach((p, idx) => {
           const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
           response += `${idx + 1}. ${p.name}\n   💰 Giá: ${price}đ\n`;
         });
@@ -986,46 +1449,16 @@ export class ChatService {
       }
     }
 
-    // 5. Budget Search Intent (Tìm theo tầm giá / rẻ nhất / cao cấp)
-    if (maxPrice || this.isCheapestIntent(userMessage) || this.isHighestPriceIntent(userMessage)) {
-      if (products && products.length > 0) {
-        const budgetLabel = maxPrice
-          ? `tầm giá dưới ${new Intl.NumberFormat('vi-VN').format(maxPrice)}đ`
-          : this.isCheapestIntent(userMessage)
-            ? 'mức giá tốt nhất'
-            : 'phân khúc cao cấp';
-        let response = `🏷️ **Dạ shop có các sản phẩm ở ${budgetLabel} phù hợp cho mình đây ạ:**\n\n`;
-        products.slice(0, 4).forEach((p, idx) => {
-          const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
-          response += `${idx + 1}. **${p.name}**\n   💰 Giá: **${price}đ**\n`;
-        });
-        response += `\nAnh/chị cần em kiểm tra còn size cho mẫu nào không ạ?`;
-        return response;
-      }
-    }
-
-    // 6. Product Search Intent (Tìm theo tên / loại sản phẩm)
-    const isProductQuery = /\b(ao|quan|vay|dam|giay|dep|tui|balo|khoac|so mi|thun|jeans|kaki|nam|nu|size|mau|chat lieu|mau ma|san pham|do nam|do nu)\b/i.test(
-      unaccentText,
-    );
-    if (isProductQuery && products && products.length > 0) {
-      let response = `🛍️ **Dạ shop có những mẫu sản phẩm phù hợp với yêu cầu của anh/chị đây ạ:**\n\n`;
-      products.slice(0, 4).forEach((p, idx) => {
-        const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
-        response += `${idx + 1}. **${p.name}**\n   💰 Giá: **${price}đ**\n`;
-      });
-      response += `\nAnh/chị cần em tư vấn chi tiết về size, màu sắc hoặc hình ảnh thực tế mẫu nào cứ nhắn em nhé!`;
-      return response;
-    }
-
-    // 7. General Fallback with Product Suggestions
+    // 6. General Products Listing
     if (products && products.length > 0) {
-      let response = `Dạ shop em xin gợi ý một số sản phẩm nổi bật đang có sẵn tại shop:\n\n`;
-      products.slice(0, 3).forEach((p, idx) => {
+      const catName = this.extractCategoryFromMessage(userMessage);
+      const prefix = catName ? `sản phẩm ${catName}` : 'sản phẩm';
+      let response = `🛍️ Dạ shop có những ${prefix} phù hợp với yêu cầu của anh/chị đây ạ:\n\n`;
+      products.forEach((p, idx) => {
         const price = new Intl.NumberFormat('vi-VN').format(this.normalizeNumber(p.price));
-        response += `${idx + 1}. **${p.name}** - ${price}đ\n`;
+        response += `${idx + 1}. ${p.name}: ${price} VNĐ\n`;
       });
-      response += `\nAnh/chị có thể hỏi chi tiết hơn về size, màu sắc, phí giao hàng hoặc chính sách đổi trả nhé ạ!`;
+      response += `\nAnh/chị cần em tư vấn chi tiết về tính năng hoặc chương trình ưu đãi của mẫu nào cứ nhắn em nhé!`;
       return response;
     }
 

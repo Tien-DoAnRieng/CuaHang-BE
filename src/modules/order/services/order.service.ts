@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger, BadGatewayException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException, Logger, BadGatewayException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
 import { Order } from '../../../shared/schemas/entities/order.entity';
@@ -24,6 +24,7 @@ import { MailSender } from '../../../shared/mail-sender';
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
+  private readonly activeOrderUsers = new Set<string>();
 
   constructor(
     @InjectRepository(Order)
@@ -48,7 +49,13 @@ export class OrderService {
     private readonly ghnService: GhnService,
   ) {}
   async placeOrder(dto: CreateOrderDto, userId: string): Promise<Order> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (this.activeOrderUsers.has(userId)) {
+      throw new ConflictException('Đơn hàng của bạn đang được xử lý, vui lòng không gửi yêu cầu liên tục!');
+    }
+    this.activeOrderUsers.add(userId);
+
+    try {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     const address = await this.addressRepository.findOne({ where: { id: dto.shippingAddressId } });
     if (!address) throw new BadRequestException('Shipping address not found');
@@ -295,7 +302,12 @@ export class OrderService {
       }
     }
 
-    return orderWithItems;
+      return orderWithItems;
+    } finally {
+      setTimeout(() => {
+        this.activeOrderUsers.delete(userId);
+      }, 3000);
+    }
   }
 
   async createGhnShipment(orderId: string): Promise<Order> {
