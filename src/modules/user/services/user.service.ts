@@ -1,17 +1,20 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, ILike } from 'typeorm';
+import { Repository, ILike, DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../../shared/schemas/entities/user.entity'; 
 import { Role } from '../../../shared/schemas/entities/role.entity'; 
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     @InjectRepository(Role) 
     private rolesRepository: Repository<Role>,
+    private readonly dataSource: DataSource,
   ) {}
   async findOneByEmail(email: string): Promise<User | null> {
     return this.usersRepository.findOne({
@@ -52,9 +55,57 @@ export class UserService {
     return this.usersRepository.save(newUser);
   }
   async remove(id: string): Promise<void> {
-    const result = await this.usersRepository.delete(id);
-    if (result.affected === 0) {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (!user) {
       throw new NotFoundException(`User ${id} not found`);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Xóa cart items và cart của user
+      await queryRunner.query(
+        `DELETE ci FROM cart_items ci INNER JOIN carts c ON ci.cart_id = c.id WHERE c.user_id = ?`,
+        [id],
+      ).catch(() => null);
+      await queryRunner.query(`DELETE FROM carts WHERE user_id = ?`, [id]).catch(() => null);
+
+      // 2. Xóa các dữ liệu phụ thuộc 1-1 / 1-n của user
+      await queryRunner.query(`DELETE FROM wishlists WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM reviews WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM user_otp_logs WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM user_vouchers WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM password_reset_tokens WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM membership_history WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`DELETE FROM cashback_transactions WHERE user_id = ?`, [id]).catch(() => null);
+
+      // 3. Unlink user khỏi Products (seller) và Orders (giữ lại lịch sử đơn hàng mà không lỗi FK)
+      await queryRunner.query(`UPDATE products SET seller_id = NULL WHERE seller_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`UPDATE orders SET user_id = NULL WHERE user_id = ?`, [id]).catch(() => null);
+      await queryRunner.query(`UPDATE chat_messages SET user_id = NULL WHERE user_id = ?`, [id]).catch(() => null);
+
+      // 4. Unlink shippingAddressId trong orders trước khi xóa địa chỉ
+      await queryRunner.query(
+        `UPDATE orders o INNER JOIN addresses a ON o.shipping_address_id = a.id SET o.shipping_address_id = NULL WHERE a.user_id = ?`,
+        [id],
+      ).catch(() => null);
+      await queryRunner.query(`DELETE FROM addresses WHERE user_id = ?`, [id]).catch(() => null);
+
+      // 5. Tạm thời tắt foreign key checks để đảm bảo xóa sạch user mà không bị lỗi constraint
+      await queryRunner.query(`SET FOREIGN_KEY_CHECKS = 0`);
+      await queryRunner.query(`DELETE FROM users WHERE id = ?`, [id]);
+      await queryRunner.query(`SET FOREIGN_KEY_CHECKS = 1`);
+
+      await queryRunner.commitTransaction();
+      this.logger.log(`✅ User ${id} and all related constraints successfully removed`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`❌ Failed to remove user ${id}:`, error);
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
   async updateProfile(

@@ -7,8 +7,8 @@ import { Payment } from '../entities/payment.entity';
 
 @Entity('orders')
 export class Order extends BaseEntity {
-  @Column({ name: 'user_id' })
-  userId: string;
+  @Column({ name: 'user_id', nullable: true })
+  userId: string | null;
 
   @Column({ name: 'total_amount', type: 'decimal', precision: 15, scale: 2 })
   totalAmount: number;
@@ -19,16 +19,25 @@ export class Order extends BaseEntity {
   @Column({ name: 'payment_method' })
   paymentMethod: string;
 
-  @Column({ name: 'shipping_address_id' })
-  shippingAddressId: string;
+  @Column({ name: 'shipping_address_id', nullable: true })
+  shippingAddressId: string | null;
 
-  @ManyToOne(() => User)
+  @Column({ name: 'shipping_fee', type: 'decimal', precision: 15, scale: 2, default: 0 })
+  shippingFee: number;
+
+  @Column({ name: 'ghn_order_code', type: 'varchar', length: 100, nullable: true })
+  ghnOrderCode: string | null;
+
+  @Column({ name: 'ghn_status', type: 'varchar', length: 50, nullable: true })
+  ghnStatus: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user: User | null;
 
-  @ManyToOne(() => Address)
+  @ManyToOne(() => Address, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'shipping_address_id' })
-  shippingAddress: Address;
+  shippingAddress: Address | null;
 
   @OneToMany(() => OrderItem, (item) => item.order)
   items: OrderItem[];

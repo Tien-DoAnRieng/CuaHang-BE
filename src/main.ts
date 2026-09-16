@@ -10,18 +10,44 @@ async function bootstrap() {
   // Khi frontend gửi request kèm credentials, Access-Control-Allow-Origin
   // KHÔNG được là wildcard '*'. Đặt origin cụ thể hoặc đọc từ env.
   const allowedOrigins = [
-    'http://localhost:5173', // Frontend user
-    'http://localhost:5174', // Frontend admin
+    'http://localhost:5173',
+    'http://localhost:5174',
     process.env.FRONTEND_URL,
     process.env.FRONTEND_ORIGIN,
-  ].filter(Boolean); // Loại bỏ undefined
+  ].filter(Boolean) as string[];
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Cho phép request không có origin (như mobile app, server-to-server, curl)
+      if (!origin) return callback(null, true);
+
+      // Cho phép localhost, các domain Vercel và Render
+      if (
+        origin.includes('localhost') ||
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.onrender.com') ||
+        allowedOrigins.includes(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Cache-Control',
+      'Pragma',
+      'Expires',
+      'X-Requested-With',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers',
+    ],
+    exposedHeaders: ['Content-Range', 'X-Total-Count', 'Authorization'],
   });
-
-
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -30,21 +56,20 @@ async function bootstrap() {
     }),
   );
 
- 
   const config = new DocumentBuilder()
     .setTitle('Ecommerce API')
     .setDescription('API documentation for the Ecommerce project')
     .setVersion('1.0')
-    .addTag('Ecommerce') // thêm tag cho nhóm API
-    .addServer('http://localhost:3000') // hiện base URL trên Swagger
-  .addBearerAuth(
+    .addTag('Ecommerce')
+    .addServer('/')
+    .addBearerAuth(
       {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
         in: 'header',
       },
-      'access-token', // tên security scheme
+      'access-token',
     )
     .build();
     

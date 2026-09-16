@@ -16,6 +16,8 @@ import {
   WeeklyGrowthDto,
 } from './dto/dashboard.dto';
 
+const REVENUE_STATUSES = ['PAID', 'COMPLETED', 'DELIVERED'];
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -105,6 +107,7 @@ export class DashboardService {
         .where('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
         .andWhere('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
         .andWhere('order.id IN (:...orderIds)', { orderIds })
+        .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES })
         .getRawOne();
       return Number(result?.total || 0);
     }
@@ -115,18 +118,21 @@ export class DashboardService {
       .select('SUM(order.totalAmount)', 'total')
       .where('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
       .andWhere('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+      .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES })
       .getRawOne();
     return Number(result?.total || 0);
   }
   async getRevenueByCategory(sellerId?: string): Promise<CategoryRevenueDto[]> {
     let qb = this.orderItemRepo
       .createQueryBuilder('item')
+      .leftJoin('item.order', 'order')
       .leftJoin('item.variant', 'variant')
       .leftJoin('variant.product', 'product')
-      .leftJoin('product.category', 'category');
+      .leftJoin('product.category', 'category')
+      .where('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES });
     
     if (sellerId) {
-      qb = qb.where('product.sellerId = :sellerId', { sellerId });
+      qb = qb.andWhere('product.sellerId = :sellerId', { sellerId });
     }
     
     const result = await qb
@@ -176,6 +182,7 @@ export class DashboardService {
       .select('EXTRACT(WEEK FROM order.createdAt)', 'week')
       .addSelect('SUM(order.totalAmount)', 'revenue')
       .where('order.createdAt BETWEEN :past AND :now', { past, now })
+      .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES })
       .groupBy('week')
       .orderBy('week', 'ASC')
       .getRawMany();
@@ -232,6 +239,7 @@ async exportRevenueExcel(
         start: dayStart,
         end: dayEnd,
       })
+      .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES })
       .getRawOne();
     
     sheet.addRow([date, Number(result?.total || 0), 0]);
@@ -254,6 +262,7 @@ async exportRevenueExcel(
         .createQueryBuilder('order')
         .select('SUM(order.totalAmount)', 'total')
         .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
+        .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES })
         .getRawOne();
       sheet.addRow([year, Number(result?.total || 0), 0]);
     }
@@ -306,7 +315,7 @@ async exportOrdersExcel(type: 'day' | 'week' | 'month', date: string): Promise<B
 
   const orders = await ordersQuery.getMany();
   orders.forEach(o => {
-    sheet.addRow([o.id, o.user.name, o.totalAmount, o.createdAt]);
+    sheet.addRow([o.id, o.user?.name || 'N/A', o.totalAmount, o.createdAt]);
   });
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
@@ -318,7 +327,8 @@ async getDailyRevenue(year: number, month: number, sellerId?: string): Promise<M
     .select('EXTRACT(DAY FROM order.createdAt)', 'day')
     .addSelect('SUM(order.totalAmount)', 'total')
     .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })
-    .andWhere('EXTRACT(MONTH FROM order.createdAt) = :month', { month });
+    .andWhere('EXTRACT(MONTH FROM order.createdAt) = :month', { month })
+    .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES });
   
   if (sellerId) {
     const orderIds = await this.getOrderIdsBySeller(sellerId);
@@ -352,7 +362,8 @@ async getYearlyRevenue(sellerId?: string): Promise<MonthlyRevenueDto[]> {
     .createQueryBuilder('order')
     .select('EXTRACT(YEAR FROM order.createdAt)', 'year')
     .addSelect('SUM(order.totalAmount)', 'total')
-    .where('EXTRACT(YEAR FROM order.createdAt) >= :startYear', { startYear });
+    .where('EXTRACT(YEAR FROM order.createdAt) >= :startYear', { startYear })
+    .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES });
   
   if (sellerId) {
     const orderIds = await this.getOrderIdsBySeller(sellerId);
@@ -382,7 +393,8 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
     .createQueryBuilder('order')
     .select('EXTRACT(MONTH FROM order.createdAt)', 'month')
     .addSelect('SUM(order.totalAmount)', 'actual')
-    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year: y });
+    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year: y })
+    .andWhere('order.status IN (:...revenueStatuses)', { revenueStatuses: REVENUE_STATUSES });
   
   if (sellerId) {
     const orderIds = await this.getOrderIdsBySeller(sellerId);
@@ -421,7 +433,8 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
       .leftJoin('payment.order', 'order')
       .select('payment.paymentMethod', 'method')
       .addSelect('SUM(order.totalAmount)', 'amount')
-      .where('payment.status = :status', { status: 'SUCCESS' });
+      .where('payment.status = :status', { status: 'SUCCESS' })
+      .andWhere('order.status IN (:...statuses)', { statuses: REVENUE_STATUSES });
     
     if (orderIds) {
       qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
@@ -435,7 +448,7 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
         .createQueryBuilder('order')
         .select('order.paymentMethod', 'method')
         .addSelect('SUM(order.totalAmount)', 'amount')
-        .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+        .where('order.status IN (:...statuses)', { statuses: REVENUE_STATUSES });
       
       if (orderIds) {
         orderQb = orderQb.andWhere('order.id IN (:...orderIds)', { orderIds });
@@ -474,7 +487,8 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
       .addSelect('COUNT(payment.id)', 'count')
       .where('payment.paymentTime >= :start', { start: today })
       .andWhere('payment.paymentTime < :end', { end: tomorrow })
-      .andWhere('payment.status = :status', { status: 'SUCCESS' });
+      .andWhere('payment.status = :status', { status: 'SUCCESS' })
+      .andWhere('order.status IN (:...statuses)', { statuses: REVENUE_STATUSES });
     
     if (orderIds) {
       qb = qb.andWhere('order.id IN (:...orderIds)', { orderIds });
@@ -491,7 +505,7 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
         .addSelect('COUNT(order.id)', 'count')
         .where('order.createdAt >= :start', { start: today })
         .andWhere('order.createdAt < :end', { end: tomorrow })
-        .andWhere('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+        .andWhere('order.status IN (:...statuses)', { statuses: REVENUE_STATUSES });
       
       if (orderIds) {
         orderQb = orderQb.andWhere('order.id IN (:...orderIds)', { orderIds });
@@ -518,7 +532,7 @@ async getMonthlyRevenue(year?: number, sellerId?: string): Promise<MonthlyRevenu
       .addSelect('product.name', 'name')
       .addSelect('SUM(item.quantity)', 'sold')
       .addSelect('SUM(item.priceAtTime * item.quantity)', 'revenue')
-      .where('order.status IN (:...statuses)', { statuses: ['DELIVERED', 'COMPLETED', 'PAID', 'SHIPPED'] });
+      .where('order.status IN (:...statuses)', { statuses: REVENUE_STATUSES });
     
     if (sellerId) {
       qb = qb.andWhere('product.sellerId = :sellerId', { sellerId });

@@ -33,7 +33,7 @@ export class Review extends BaseEntity {
   @Column({ type: 'datetime', nullable: true, name: 'reply_date' })
   replyDate: Date;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 

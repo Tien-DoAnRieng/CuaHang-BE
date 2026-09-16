@@ -109,6 +109,15 @@ export class OrderController {
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
     return this.orderService.updateStatus(id, dto.status);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.ADMIN, RoleEnum.SELLER)
+  @Post(':id/ghn-shipment')
+  @ApiOperation({ summary: 'Tạo mã vận đơn GHN cho đơn hàng' })
+  @ApiParam({ name: 'id', required: true, description: 'ID đơn hàng' })
+  async createGhnShipment(@Param('id') id: string) {
+    return this.orderService.createGhnShipment(id);
+  }
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleEnum.ADMIN)
   @Delete(':id')

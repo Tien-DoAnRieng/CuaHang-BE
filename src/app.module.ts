@@ -30,13 +30,42 @@ import { BrandModule } from './modules/brand/brand.module';
 import { MemberTypeModule } from './modules/member-type/member-type.module';
 import { CouponModule } from './modules/coupon/coupon.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { GhnModule } from './modules/ghn/ghn.module';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { mailerConfig } from './config/mailer.config';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [cloudinaryConfig, vnpayConfig],
+      load: [cloudinaryConfig, vnpayConfig],
     }),
     TypeOrmModule.forRootAsync(typeOrmConfig),
+    MailerModule.forRootAsync(mailerConfig),
+    UserModule,
+  ProductModule,
+  PaymentModule,
+  CategoryModule,
+  BrandModule,
+  ProductImageModule,
+  ProductVariantModule,
+  CartModule,
+  OrderModule,
+  AuthModule,
+  ReviewModule,
+  WishlistModule,
+  QueueModule,
+  FileUploadModule,
+  AddressModule,
+  DashboardModule,
+  BannerModule,
+  FlashSaleModule,
+  ColorSizeModule,
+  MemberTypeModule,
+  CouponModule,
+  ChatModule,
+  GhnModule
     UserModule,
     ProductModule,
     PaymentModule,

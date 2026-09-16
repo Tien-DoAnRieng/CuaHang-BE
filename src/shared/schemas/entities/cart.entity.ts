@@ -7,7 +7,7 @@ import { Payment } from './payment.entity';
 export class Cart extends BaseEntity {
   @Column({ name: 'user_id' })
   userId: string;
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
   @OneToMany(() => CartItem, (cartItem: CartItem) => cartItem.cart)

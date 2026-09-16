@@ -1,18 +1,21 @@
-// src/queue/queue.module.ts
 import { BullModule } from '@nestjs/bull';
 import { Module, Logger } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { QueueService } from './queue.service';
-import { EmailProcessor } from '.././queue/processors/email.processor';
+import { EmailProcessor } from './processors/email.processor';
 
 @Module({
   imports: [
+    MailerModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const redisHost = config.get('REDIS_HOST', 'localhost');
         const redisPort = config.get('REDIS_PORT', 6379);
+        const redisPassword = config.get('REDIS_PASSWORD'); // Thêm dòng này
+
         const logger = new Logger('QueueModule');
         
         logger.log(`🔧 Configuring Redis connection: ${redisHost}:${redisPort}`);
@@ -21,6 +24,8 @@ import { EmailProcessor } from '.././queue/processors/email.processor';
           redis: {
             host: redisHost,
             port: redisPort,
+            password: redisPassword || undefined,
+            tls: config.get('REDIS_TLS') === 'true' ? {} : undefined,
             retryStrategy: (times: number) => {
               if (times > 3) {
                 logger.error('❌ Redis connection failed after 3 retries. Please check if Redis is running.');

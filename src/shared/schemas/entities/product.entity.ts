@@ -46,7 +46,7 @@ export class Product extends BaseEntity {
   @Column({ name: 'seller_id', nullable: true })
   sellerId: string; // ID của seller sở hữu sản phẩm
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'seller_id' })
   seller: User; // Quan hệ với User (seller)
 
